@@ -18,17 +18,15 @@ const canvas = document.getElementById("renderCanvas");
 const engine = new BABYLON.Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true });
 
 // --- Tunable constants (units are roughly "meters") -----------------------
-const BALL_RADIUS = 0.35;
-const HOLE_RADIUS = 0.6;
-const CUP_DEPTH = 0.85;
-const FUNNEL_R = 1.6;          // radius of the gentle dip that feeds the cup
-const FUNNEL_DEPTH = 0.13;
-const GRAVITY = 22;            // units / s^2
-const GROUND_RESTITUTION = 0.32;
-const WALL_RESTITUTION = 0.62;
-const ROLL_C = 0.82;           // rolling-friction decay coefficient (per second)
-const STOP_SPEED = 0.32;       // below this horizontal speed on the ground, the ball stops
-const MAX_SPEED = 16;          // strongest putt
+const BALL_RADIUS = 0.32;
+const HOLE_RADIUS = 0.55;
+const CUP_DEPTH = 0.7;
+const GRAVITY = 20;            // units / s^2
+const GROUND_RESTITUTION = 0.25;
+const WALL_RESTITUTION = 0.55;
+const FRICTION_DECEL = 5.5;    // rolling friction as constant deceleration (units/s^2)
+const STOP_SPEED = 0.25;       // below this horizontal speed on the ground, the ball stops
+const MAX_SPEED = 15;          // strongest putt
 const WALL_HEIGHT = 1.1;
 const WALL_THICK = 0.5;
 const FIXED_DT = 1 / 120;      // physics sub-step
@@ -160,22 +158,14 @@ function baseHeight(x, z) {
   return h;
 }
 
-function funnelOffset(dc) {
-  if (dc >= FUNNEL_R) return 0;
-  const t = 1 - dc / FUNNEL_R;
-  return -FUNNEL_DEPTH * t * t;
-}
-
-// Green surface height (base ramps + cup funnel), excluding the vertical pit.
+// Green surface height (ramps only -> smooth, even surface).
 function terrainHeight(x, z) {
-  let h = baseHeight(x, z);
-  const dc = Math.hypot(x - cupX, z - cupZ);
-  h += funnelOffset(dc);
-  return h;
+  return baseHeight(x, z);
 }
 
 function terrainNormal(x, z) {
-  const e = 0.06;
+  if (features.length === 0) return { x: 0, y: 1, z: 0 };
+  const e = 0.08;
   const hL = terrainHeight(x - e, z);
   const hR = terrainHeight(x + e, z);
   const hD = terrainHeight(x, z - e);
@@ -185,13 +175,6 @@ function terrainNormal(x, z) {
   let ny = 1;
   const len = Math.hypot(nx, ny, nz) || 1;
   return { x: nx / len, y: ny / len, z: nz / len };
-}
-
-// Height used to build the visible mesh (includes the depressed pit).
-function meshHeight(x, z) {
-  const dc = Math.hypot(x - cupX, z - cupZ);
-  if (dc < HOLE_RADIUS) return cupFloorY;
-  return terrainHeight(x, z);
 }
 
 // Where the ball's CENTER is supported at (x, z), plus the surface normal.
@@ -257,25 +240,31 @@ function makeTree(x, z, s, rng) {
 }
 
 function buildGreen(cx, cz, width, depth) {
-  const subs = Math.min(Math.max(Math.round(Math.max(width, depth) / 0.18), 80), 220);
-  const green = BABYLON.MeshBuilder.CreateGround("ground", { width, height: depth, subdivisions: subs, updatable: true }, scene);
+  // Moderate subdivisions: enough to render ramps smoothly, light enough for CSG.
+  const subs = Math.min(Math.max(Math.round(Math.max(width, depth) / 0.5), 24, baseMax > 0 ? 48 : 24), 90);
+  let green = BABYLON.MeshBuilder.CreateGround("greenBase", { width, height: depth, subdivisions: subs, updatable: true }, scene);
   green.position.set(cx, 0, cz);
 
-  const positions = green.getVerticesData(BABYLON.VertexBuffer.PositionKind);
-  for (let i = 0; i < positions.length; i += 3) {
-    const wx = positions[i] + cx;
-    const wz = positions[i + 2] + cz;
-    positions[i + 1] = meshHeight(wx, wz);
+  // Displace only for ramps so the surface stays smooth and even.
+  if (features.length > 0) {
+    const positions = green.getVerticesData(BABYLON.VertexBuffer.PositionKind);
+    for (let i = 0; i < positions.length; i += 3) {
+      positions[i + 1] = baseHeight(positions[i] + cx, positions[i + 2] + cz);
+    }
+    const normals = [];
+    BABYLON.VertexData.ComputeNormals(positions, green.getIndices(), normals);
+    green.updateVerticesData(BABYLON.VertexBuffer.PositionKind, positions);
+    green.updateVerticesData(BABYLON.VertexBuffer.NormalKind, normals);
   }
-  const indices = green.getIndices();
-  const normals = [];
-  BABYLON.VertexData.ComputeNormals(positions, indices, normals);
-  green.updateVerticesData(BABYLON.VertexBuffer.PositionKind, positions);
-  green.updateVerticesData(BABYLON.VertexBuffer.NormalKind, normals);
 
-  green.material = grassMat;
-  green.receiveShadows = true;
-  courseMeshes.push(green);
+  // Cut a clean circular hole at the cup using CSG.
+  const cutter = BABYLON.MeshBuilder.CreateCylinder("cutter", { height: baseMax + CUP_DEPTH + 6, diameter: HOLE_RADIUS * 2, tessellation: 40 }, scene);
+  cutter.position.set(cupX, cupBaseY, cupZ);
+  const result = BABYLON.CSG.FromMesh(green).subtract(BABYLON.CSG.FromMesh(cutter)).toMesh("ground", grassMat, scene);
+  green.dispose();
+  cutter.dispose();
+  result.receiveShadows = true;
+  courseMeshes.push(result);
 }
 
 function buildHole(index) {
@@ -302,7 +291,7 @@ function buildHole(index) {
 
   // cup vertical metrics
   cupBaseY = baseHeight(cupX, cupZ);
-  cupRimY = cupBaseY + funnelOffset(HOLE_RADIUS);
+  cupRimY = cupBaseY;
   cupFloorY = cupBaseY - CUP_DEPTH;
 
   const width = bounds.maxX - bounds.minX;
@@ -316,16 +305,27 @@ function buildHole(index) {
   floor.material = floorMat;
   courseMeshes.push(floor);
 
-  // Displaced green (flat + ramps + cup pit)
+  // Even green with a clean CSG-cut hole at the cup
   buildGreen(cx, cz, width, depth);
 
-  // Dark cup: a closed dark cylinder whose top sits just below the rim, so it
-  // reads as a clean recessed hole. The mesh pit underneath lets the ball drop.
-  const cupTopY = cupRimY - 0.02;
-  const tube = BABYLON.MeshBuilder.CreateCylinder("cupTube", { height: CUP_DEPTH, diameter: HOLE_RADIUS * 2, tessellation: 30 }, scene);
-  tube.position.set(cupX, cupTopY - CUP_DEPTH / 2, cupZ);
-  tube.material = cupMat;
-  courseMeshes.push(tube);
+  // Dark cup interior: walls lining the cut + a floor disc, so you see down
+  // into a clean round hole.
+  const wall = BABYLON.MeshBuilder.CreateCylinder("cupWall", { height: CUP_DEPTH, diameter: HOLE_RADIUS * 2 * 0.995, tessellation: 40, cap: BABYLON.Mesh.NO_CAP }, scene);
+  wall.position.set(cupX, cupBaseY - CUP_DEPTH / 2, cupZ);
+  wall.material = cupMat;
+  courseMeshes.push(wall);
+
+  const cupBottom = BABYLON.MeshBuilder.CreateDisc("cupBottom", { radius: HOLE_RADIUS * 0.995, tessellation: 40 }, scene);
+  cupBottom.rotation.x = Math.PI / 2;
+  cupBottom.position.set(cupX, cupFloorY + 0.005, cupZ);
+  cupBottom.material = cupMat;
+  courseMeshes.push(cupBottom);
+
+  // Thin dark rim ring to crisp up the edge of the hole
+  const rim = BABYLON.MeshBuilder.CreateTorus("cupRim", { diameter: HOLE_RADIUS * 2, thickness: 0.07, tessellation: 40 }, scene);
+  rim.position.set(cupX, cupBaseY + 0.005, cupZ);
+  rim.material = cupMat;
+  courseMeshes.push(rim);
 
   // Perimeter walls (raised to cover any plateau)
   const pwh = WALL_HEIGHT + baseMax;
@@ -469,10 +469,14 @@ function resolveGround(dt) {
       vel.y -= j * n.y;
       vel.z -= j * n.z;
     }
-    // rolling friction (horizontal)
-    const damp = Math.exp(-ROLL_C * dt);
-    vel.x *= damp;
-    vel.z *= damp;
+    // rolling friction: constant deceleration so the ball slows and stops
+    // decisively (grass), instead of creeping forever.
+    const sp = Math.hypot(vel.x, vel.z);
+    if (sp > 1e-5) {
+      const f = Math.max(0, sp - FRICTION_DECEL * dt) / sp;
+      vel.x *= f;
+      vel.z *= f;
+    }
     if (Math.abs(vel.y) < 0.5) vel.y = 0;
   }
 }
@@ -486,7 +490,7 @@ function checkCapture() {
   }
 }
 
-const STATIC_FRICTION = 0.18; // tan of the max slope angle the ball can rest on (~10deg)
+const STATIC_FRICTION = 0.27; // max slope (sin) the ball can rest on before rolling (~15deg)
 
 function checkStop() {
   if (holeComplete) return;
