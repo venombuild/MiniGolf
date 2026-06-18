@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mini Golf</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="ui">
+    <div id="hud">
+      <span class="label">Hole</span>
+      <span id="hole">1</span>
+      <span class="sep">·</span>
+      <span class="label">Strokes</span>
+      <span id="strokes">0</span>
+      <span class="sep">·</span>
+      <span class="label">Par</span>
+      <span id="par">3</span>
+    </div>
+    <div id="hint">Click &amp; drag from the ball to aim, release to putt</div>
+  </div>
+
+  <div id="message" class="hidden">
+    <div class="card">
+      <h1 id="msg-title">Nice!</h1>
+      <p id="msg-body"></p>
+      <button id="msg-btn">Next Hole</button>
+    </div>
+  </div>
+
+  <canvas id="renderCanvas" touch-action="none"></canvas>
+
+  <script src="https://cdn.babylonjs.com/babylon.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
