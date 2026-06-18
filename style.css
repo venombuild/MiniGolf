@@ -10,7 +10,7 @@ body {
   height: 100%;
   overflow: hidden;
   font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
-  background: #0b1020;
+  background: #0c130d;
 }
 
 #renderCanvas {
@@ -38,9 +38,9 @@ body {
 #hud {
   display: flex;
   align-items: center;
-  gap: 10px;
-  background: rgba(10, 16, 32, 0.65);
-  color: #fff;
+  gap: 9px;
+  background: rgba(12, 24, 14, 0.62);
+  color: #eafbe7;
   padding: 10px 18px;
   border-radius: 999px;
   backdrop-filter: blur(8px);
@@ -48,28 +48,36 @@ body {
   font-weight: 600;
   letter-spacing: 0.3px;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 #hud .label {
-  opacity: 0.6;
+  opacity: 0.55;
   font-weight: 500;
   font-size: 13px;
   text-transform: uppercase;
 }
 
+#hud .muted {
+  opacity: 0.4;
+  font-weight: 500;
+}
+
 #hud .sep {
-  opacity: 0.3;
+  opacity: 0.25;
 }
 
 #hint {
-  background: rgba(10, 16, 32, 0.5);
-  color: #cdd6ff;
+  background: rgba(12, 24, 14, 0.5);
+  color: #cfe9c8;
   padding: 6px 14px;
   border-radius: 999px;
   font-size: 13px;
   backdrop-filter: blur(8px);
 }
 
+/* Overlays */
+#start,
 #message {
   position: absolute;
   inset: 0;
@@ -77,52 +85,126 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(5, 8, 18, 0.55);
+  background: rgba(4, 10, 5, 0.55);
   backdrop-filter: blur(4px);
 }
 
-#message.hidden {
+#start.hidden,
+#message.hidden,
+#scorecard.hidden {
   display: none;
 }
 
-#message .card {
-  background: #141b33;
-  color: #fff;
+.card {
+  background: linear-gradient(180deg, #18301b, #122414);
+  color: #eafbe7;
   padding: 32px 40px;
   border-radius: 18px;
   text-align: center;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  max-width: 90%;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(140, 220, 150, 0.14);
+  max-width: 92%;
 }
 
-#message h1 {
-  font-size: 28px;
+.card h1 {
+  font-size: 30px;
   margin-bottom: 8px;
 }
 
-#message p {
-  opacity: 0.75;
-  margin-bottom: 22px;
+.card .tag {
+  opacity: 0.7;
+  margin-bottom: 18px;
   font-size: 15px;
 }
 
-#message button {
-  background: #5b7cff;
-  color: #fff;
+.card p {
+  opacity: 0.8;
+  margin-bottom: 20px;
+  font-size: 15px;
+}
+
+.card .how {
+  list-style: none;
+  text-align: left;
+  margin: 0 auto 24px;
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.card .how li {
+  font-size: 14px;
+  opacity: 0.85;
+  padding-left: 20px;
+  position: relative;
+}
+
+.card .how li::before {
+  content: "›";
+  position: absolute;
+  left: 4px;
+  color: #7fe39a;
+  font-weight: 700;
+}
+
+button {
+  background: #3fae5a;
+  color: #06210d;
   border: none;
-  padding: 12px 28px;
+  padding: 12px 30px;
   border-radius: 999px;
   font-size: 16px;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
   transition: transform 0.08s ease, background 0.15s ease;
 }
 
-#message button:hover {
-  background: #6e8bff;
+button:hover {
+  background: #4fc46c;
 }
 
-#message button:active {
+button:active {
   transform: scale(0.96);
+}
+
+/* Scorecard */
+#scorecard {
+  margin: 0 auto 22px;
+  max-width: 460px;
+}
+
+#scorecard table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+#scorecard th,
+#scorecard td {
+  padding: 5px 8px;
+  text-align: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+#scorecard th {
+  opacity: 0.55;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 11px;
+}
+
+#scorecard td.under {
+  color: #6ee38a;
+}
+
+#scorecard td.over {
+  color: #e88a7a;
+}
+
+#scorecard tr.total td {
+  font-weight: 700;
+  border-top: 2px solid rgba(255, 255, 255, 0.15);
+  border-bottom: none;
+  padding-top: 8px;
 }
