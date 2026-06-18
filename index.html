@@ -4,7 +4,16 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Forest Mini Golf</title>
-  <link rel="stylesheet" href="style.css" />
+  <!-- Never let the browser serve a stale page -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <!-- Load the stylesheet with a per-load version so it's never cached -->
+  <script>
+    document.write(
+      '<link rel="stylesheet" href="style.css?v=' + Date.now() + '">'
+    );
+  </script>
 </head>
 <body>
   <div id="ui">
@@ -52,6 +61,11 @@
   <canvas id="renderCanvas" touch-action="none"></canvas>
 
   <script src="https://cdn.babylonjs.com/babylon.js"></script>
-  <script src="game.js"></script>
+  <!-- Load the game with a per-load version so updates always show immediately -->
+  <script>
+    document.write(
+      '<script src="game.js?v=' + Date.now() + '"><\/script>'
+    );
+  </script>
 </body>
 </html>
