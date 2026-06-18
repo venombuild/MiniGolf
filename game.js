@@ -15,7 +15,12 @@
 // ---------------------------------------------------------------------------
 
 const canvas = document.getElementById("renderCanvas");
-const engine = new BABYLON.Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true });
+const engine = new BABYLON.Engine(
+  canvas,
+  true,
+  { preserveDrawingBuffer: true, stencil: true, antialias: true },
+  true // adaptToDeviceRatio -> render at full device resolution (crisper)
+);
 
 // --- Tunable constants (units are roughly "meters") -----------------------
 const BALL_RADIUS = 0.32;
@@ -24,9 +29,10 @@ const CUP_DEPTH = 0.7;
 const GRAVITY = 20;            // units / s^2
 const GROUND_RESTITUTION = 0.25;
 const WALL_RESTITUTION = 0.55;
-const FRICTION_DECEL = 5.5;    // rolling friction as constant deceleration (units/s^2)
+const FRICTION_DECEL = 6.5;    // rolling friction as constant deceleration (units/s^2)
 const STOP_SPEED = 0.25;       // below this horizontal speed on the ground, the ball stops
-const MAX_SPEED = 15;          // strongest putt
+const MAX_SPEED = 24;          // strongest putt
+const CAPTURE_SPEED = 6.5;     // max speed over the cup that still drops in (else lip-out)
 const WALL_HEIGHT = 1.1;
 const WALL_THICK = 0.5;
 const FIXED_DT = 1 / 120;      // physics sub-step
@@ -70,10 +76,10 @@ const holeScores = new Array(HOLES.length).fill(null);
 // Scene + atmosphere
 // ---------------------------------------------------------------------------
 const scene = new BABYLON.Scene(engine);
-scene.clearColor = new BABYLON.Color3(0.42, 0.55, 0.45);
+scene.clearColor = new BABYLON.Color3(0.55, 0.74, 0.92);
 scene.fogMode = BABYLON.Scene.FOGMODE_EXP2;
-scene.fogColor = new BABYLON.Color3(0.42, 0.55, 0.45);
-scene.fogDensity = 0.017;
+scene.fogColor = new BABYLON.Color3(0.72, 0.84, 0.93);
+scene.fogDensity = 0.006;
 
 const camera = new BABYLON.ArcRotateCamera("camera", -Math.PI / 2, 0.82, 30, BABYLON.Vector3.Zero(), scene);
 camera.attachControl(canvas, true);
@@ -84,17 +90,62 @@ camera.upperRadiusLimit = 75;
 camera.wheelPrecision = 18;
 camera.panningSensibility = 0;
 
-const hemi = new BABYLON.HemisphericLight("hemi", new BABYLON.Vector3(0, 1, 0), scene);
-hemi.intensity = 0.7;
-hemi.groundColor = new BABYLON.Color3(0.2, 0.28, 0.2);
+// --- Gradient sky dome (self-contained, no external assets) ---------------
+(function buildSky() {
+  const sky = BABYLON.MeshBuilder.CreateSphere("sky", { diameter: 600, sideOrientation: BABYLON.Mesh.BACKSIDE, segments: 24 }, scene);
+  const tex = new BABYLON.DynamicTexture("skyTex", { width: 8, height: 512 }, scene, false);
+  const ctx = tex.getContext();
+  const grad = ctx.createLinearGradient(0, 0, 0, 512);
+  grad.addColorStop(0.0, "#3d7fd6");
+  grad.addColorStop(0.45, "#83b9ef");
+  grad.addColorStop(0.78, "#cfe8f7");
+  grad.addColorStop(1.0, "#e9f4ec");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 8, 512);
+  tex.update();
+  const m = new BABYLON.StandardMaterial("skyMat", scene);
+  m.disableLighting = true;
+  m.emissiveTexture = tex;
+  m.backFaceCulling = false;
+  sky.material = m;
+  sky.infiniteDistance = true;
+  sky.isPickable = false;
+  sky.applyFog = false;
+})();
 
-const sun = new BABYLON.DirectionalLight("sun", new BABYLON.Vector3(-0.5, -1, 0.4), scene);
-sun.position = new BABYLON.Vector3(30, 50, -30);
-sun.intensity = 0.85;
+const hemi = new BABYLON.HemisphericLight("hemi", new BABYLON.Vector3(0.2, 1, 0.1), scene);
+hemi.intensity = 0.55;
+hemi.diffuse = new BABYLON.Color3(0.9, 0.95, 1.0);
+hemi.groundColor = new BABYLON.Color3(0.32, 0.42, 0.3);
 
-const shadowGen = new BABYLON.ShadowGenerator(1024, sun);
+const sun = new BABYLON.DirectionalLight("sun", new BABYLON.Vector3(-0.55, -1, 0.4), scene);
+sun.position = new BABYLON.Vector3(40, 70, -40);
+sun.intensity = 1.5;
+sun.diffuse = new BABYLON.Color3(1.0, 0.98, 0.9);
+
+const shadowGen = new BABYLON.ShadowGenerator(2048, sun);
 shadowGen.useBlurExponentialShadowMap = true;
 shadowGen.blurScale = 2;
+shadowGen.darkness = 0.55;
+
+// --- Post-processing for a richer image -----------------------------------
+const pipeline = new BABYLON.DefaultRenderingPipeline("pipe", true, scene, [camera]);
+pipeline.samples = 4;                 // hardware MSAA
+pipeline.fxaaEnabled = true;
+pipeline.bloomEnabled = true;
+pipeline.bloomThreshold = 0.85;
+pipeline.bloomWeight = 0.18;
+pipeline.bloomKernel = 48;
+pipeline.sharpenEnabled = true;
+pipeline.sharpen.edgeAmount = 0.25;
+pipeline.imageProcessingEnabled = true;
+pipeline.imageProcessing.toneMappingEnabled = true;
+pipeline.imageProcessing.toneMappingType = BABYLON.ImageProcessingConfiguration.TONEMAPPING_ACES;
+pipeline.imageProcessing.exposure = 1.15;
+pipeline.imageProcessing.contrast = 1.12;
+pipeline.imageProcessing.vignetteEnabled = true;
+pipeline.imageProcessing.vignetteWeight = 1.6;
+pipeline.imageProcessing.vignetteColor = new BABYLON.Color4(0, 0, 0, 0);
 
 // ---------------------------------------------------------------------------
 // Materials
@@ -106,18 +157,19 @@ function mat(name, r, g, b, spec) {
   return m;
 }
 
-const grassMat = mat("grass", 0.22, 0.5, 0.24);
-const floorMat = mat("floor", 0.13, 0.2, 0.12);
-const woodMat = mat("wood", 0.42, 0.28, 0.16);
-const trunkMat = mat("trunk", 0.32, 0.2, 0.11);
-const leafMat = mat("leaf", 0.13, 0.36, 0.17);
-const leafMat2 = mat("leaf2", 0.17, 0.44, 0.2);
-const rockMat = mat("rock", 0.45, 0.46, 0.48, 0.12);
-const ballMat = mat("ball", 0.96, 0.97, 0.98, 0.6);
-const cupMat = mat("cup", 0.015, 0.02, 0.015);
+const grassMat = mat("grass", 0.28, 0.62, 0.27);
+const floorMat = mat("floor", 0.16, 0.24, 0.14);
+const woodMat = mat("wood", 0.5, 0.34, 0.19);
+const trunkMat = mat("trunk", 0.34, 0.21, 0.12);
+const leafMat = mat("leaf", 0.15, 0.42, 0.19);
+const leafMat2 = mat("leaf2", 0.2, 0.52, 0.24);
+const rockMat = mat("rock", 0.5, 0.51, 0.53, 0.18);
+const ballMat = mat("ball", 0.97, 0.98, 1.0, 0.9);
+ballMat.specularPower = 64;
+const cupMat = mat("cup", 0.01, 0.012, 0.01);
 cupMat.backFaceCulling = false; // so the inside walls of the open cup render
-const flagMat = mat("flag", 0.9, 0.2, 0.25);
-flagMat.emissiveColor = new BABYLON.Color3(0.35, 0.05, 0.07);
+const flagMat = mat("flag", 0.92, 0.18, 0.24);
+flagMat.emissiveColor = new BABYLON.Color3(0.3, 0.04, 0.06);
 
 // ---------------------------------------------------------------------------
 // Persistent meshes / state
@@ -484,9 +536,23 @@ function resolveGround(dt) {
 function checkCapture() {
   if (holeComplete) return;
   const dc = Math.hypot(ball.position.x - cupX, ball.position.z - cupZ);
-  if (dc < HOLE_RADIUS * 0.92 && ball.position.y < cupRimY) {
+  const speed = Math.hypot(vel.x, vel.z);
+  // The ball drops in if any of:
+  //  - its center is over the opening and it isn't flying past too fast, or
+  //  - it has already dipped below the rim, or
+  //  - its center is well inside the hole (regardless of speed).
+  const overHole = dc < HOLE_RADIUS;
+  const wellInside = dc < HOLE_RADIUS - BALL_RADIUS * 0.5;
+  if ((overHole && speed < CAPTURE_SPEED) || (overHole && ball.position.y < cupRimY - 0.01) || wellInside) {
     holeComplete = true;
-    setTimeout(recordAndAdvance, 750);
+    // bleed off momentum so the ball drops into the cup instead of skating out
+    const hs = Math.hypot(vel.x, vel.z);
+    if (hs > 1.5) {
+      const f = 1.5 / hs;
+      vel.x *= f;
+      vel.z *= f;
+    }
+    setTimeout(recordAndAdvance, 650);
   }
 }
 
@@ -494,6 +560,10 @@ const STATIC_FRICTION = 0.27; // max slope (sin) the ball can rest on before rol
 
 function checkStop() {
   if (holeComplete) return;
+  // Never allow the ball to rest while it overlaps the hole opening — it must
+  // either drop in (capture) or roll back off, never perch on the rim.
+  const dc = Math.hypot(ball.position.x - cupX, ball.position.z - cupZ);
+  if (dc < HOLE_RADIUS) return;
   const s = supportAt(ball.position.x, ball.position.z);
   const onGround = ball.position.y <= s.y + 1e-2;
   if (!onGround) return;
@@ -578,7 +648,7 @@ scene.onPointerObservable.add((info) => {
     const len = Math.sqrt(dx * dx + dz * dz);
     if (len < 0.3) return;
 
-    const speed = Math.min(len / 7, 1) * MAX_SPEED;
+    const speed = Math.min(len / 5.5, 1) * MAX_SPEED;
     vel.x = (dx / len) * speed;
     vel.z = (dz / len) * speed;
     vel.y = 0;
