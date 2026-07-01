@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Marvel Guess Who</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --red: #E8192C;
+  --red-dark: #a5111e;
+  --gold: #F5A623;
+  --dark: #0a0a0a;
+  --mid: #161616;
+  --card-bg: #1c1c1c;
+  --card-border: #2e2e2e;
+  --text: #F5F0E8;
+  --sub: #7a7a7a;
+  --elim-bg: #1a0a0a;
+  --elim-border: #2e1010;
+  --elim-text: #4a1818;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+body {
+  background: var(--dark);
+  color: var(--text);
+  font-family: 'Barlow Condensed', sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image: radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1px);
+  background-size: 18px 18px;
+  pointer-events: none; z-index: 0;
+}
+
+.screen {
+  position: relative; z-index: 1;
+  min-height: 100vh;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 24px 16px;
+}
+.screen.hidden { display: none; }
+
+.marvel-banner {
+  background: var(--red);
+  padding: 5px 20px;
+  display: inline-block;
+  margin: 0 auto 6px;
+}
+.marvel-banner span {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 28px; letter-spacing: 8px;
+  color: white;
+}
+
+.title-logo {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(60px, 17vw, 104px);
+  line-height: 0.85; text-align: center;
+  color: var(--text);
+  text-shadow: 4px 4px 0 var(--red-dark), 6px 6px 0 rgba(0,0,0,0.5);
+  letter-spacing: 3px;
+  margin-bottom: 4px;
+}
+
+.title-rule {
+  display: flex; align-items: center; gap: 0; margin: 18px auto;
+  width: 100%; max-width: 300px;
+}
+.title-rule-line { flex: 1; height: 2px; background: var(--red); }
+.title-rule-star {
+  width: 28px; height: 28px; background: var(--red);
+  clip-path: polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%);
+  margin: 0 8px; flex-shrink: 0;
+}
+
+.title-desc {
+  font-size: 14px; color: var(--sub); text-align: center;
+  letter-spacing: 1px; max-width: 260px; line-height: 1.6; margin-bottom: 32px;
+}
+
+.btn {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 22px; letter-spacing: 4px;
+  padding: 15px 36px; border: none; cursor: pointer;
+  transition: transform 0.1s, filter 0.15s;
+  display: block; width: 100%; max-width: 300px;
+  position: relative; overflow: hidden;
+}
+.btn::after {
+  content: ''; position: absolute;
+  inset: 0; background: rgba(255,255,255,0);
+  transition: background 0.15s;
+}
+.btn:hover::after { background: rgba(255,255,255,0.07); }
+.btn:active { transform: scale(0.97); }
+.btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+
+.btn-primary { background: var(--red); color: white; clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px)); }
+.btn-secondary { background: transparent; color: var(--gold); border: 2px solid var(--gold); }
+.btn-ghost { background: transparent; color: var(--sub); border: 1px solid #2e2e2e; }
+
+.btn-sm {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 15px; letter-spacing: 2px;
+  padding: 10px 18px; border: none; cursor: pointer;
+  transition: transform 0.1s;
+}
+.btn-sm:active { transform: scale(0.96); }
+.btn-sm.btn-primary { clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px)); }
+
+.setup-label {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 12px; letter-spacing: 5px; color: var(--gold);
+  margin-bottom: 8px; text-align: left;
+}
+.player-input {
+  background: var(--mid); border: none;
+  border-bottom: 2px solid var(--card-border);
+  color: var(--text); font-family: 'Bebas Neue', sans-serif;
+  font-size: 22px; letter-spacing: 2px;
+  padding: 10px 4px; width: 100%; max-width: 300px;
+  display: block; margin-bottom: 24px; outline: none;
+  transition: border-color 0.2s;
+}
+.player-input:focus { border-color: var(--red); }
+.player-input::placeholder { color: #333; }
+.setup-section { width: 100%; max-width: 320px; }
+
+.size-row { display: flex; gap: 8px; max-width: 300px; margin-bottom: 28px; }
+.size-btn {
+  flex: 1; font-family: 'Bebas Neue', sans-serif;
+  font-size: 18px; letter-spacing: 2px;
+  padding: 10px 0; border: 2px solid var(--card-border);
+  background: var(--mid); color: var(--sub); cursor: pointer;
+  transition: all 0.15s;
+}
+.size-btn.active { border-color: var(--red); color: var(--text); background: #1e0a0a; }
+
+.pass-inner { text-align: center; width: 100%; max-width: 340px; }
+
+.player-tag {
+  display: inline-block;
+  background: var(--red);
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 12px; letter-spacing: 5px;
+  padding: 4px 14px; color: white;
+  margin-bottom: 12px;
+}
+.player-tag.p2 { background: #1a3a5c; border: 1px solid #2a5a8c; }
+
+.pass-heading {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(40px, 11vw, 60px);
+  letter-spacing: 2px; color: var(--text);
+  line-height: 1; margin-bottom: 20px;
+}
+
+.secret-box {
+  background: var(--mid);
+  border: 1px solid var(--card-border);
+  border-top: 3px solid var(--red);
+  padding: 20px 22px 16px;
+  margin-bottom: 20px;
+  text-align: center;
+  position: relative;
+}
+.secret-box .sb-label {
+  font-size: 10px; letter-spacing: 5px; color: var(--sub);
+  margin-bottom: 12px; text-transform: uppercase;
+}
+.secret-box .sb-name {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 42px; letter-spacing: 2px; color: var(--text);
+  transition: filter 0.25s; line-height: 1.1;
+}
+.secret-box .sb-name.blurred { filter: blur(14px); user-select: none; }
+.secret-box .sb-hint {
+  font-size: 11px; color: var(--sub); margin-top: 10px;
+  letter-spacing: 2px; text-transform: uppercase;
+}
+
+.reveal-btn {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 18px; letter-spacing: 4px;
+  padding: 14px 28px; cursor: pointer;
+  transition: transform 0.1s, background 0.15s;
+  width: 100%; max-width: 300px; display: block;
+  border: none; margin: 0 auto 10px;
+}
+.reveal-btn:active { transform: scale(0.97); }
+.reveal-btn.show-state {
+  background: var(--gold); color: #0a0a0a;
+  clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+}
+.reveal-btn.hide-state { background: #222; color: var(--sub); border: 1px solid #333; }
+
+.handoff-inner { text-align: center; width: 100%; max-width: 300px; }
+.handoff-icon { font-size: 52px; margin-bottom: 14px; }
+.handoff-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(32px, 9vw, 50px);
+  letter-spacing: 3px; color: var(--text); margin-bottom: 8px;
+}
+.handoff-sub {
+  font-size: 14px; color: var(--sub); letter-spacing: 1px;
+  margin-bottom: 32px; line-height: 1.6;
+}
+.handoff-sub strong { color: var(--gold); }
+
+.board-wrap {
+  width: 100%; max-width: 480px;
+  display: flex; flex-direction: column; align-items: center;
+  padding-top: 12px; padding-bottom: 24px;
+}
+
+.board-header {
+  width: 100%;
+  background: var(--red);
+  padding: 10px 14px;
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 12px;
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
+}
+.board-player-label {
+  font-size: 10px; letter-spacing: 4px; color: rgba(255,255,255,0.6); margin-bottom: 1px;
+}
+.board-player-name {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 22px; letter-spacing: 2px; color: white;
+}
+.board-instruct {
+  font-size: 10px; letter-spacing: 2px;
+  color: rgba(255,255,255,0.5); text-align: right; line-height: 1.4;
+}
+
+.elim-bar {
+  width: 100%; display: flex; align-items: center;
+  gap: 8px; margin-bottom: 10px;
+}
+.elim-bar-track {
+  flex: 1; height: 3px; background: #222; border-radius: 2px; overflow: hidden;
+}
+.elim-bar-fill {
+  height: 100%; background: var(--red);
+  border-radius: 2px; transition: width 0.3s;
+  width: 0%;
+}
+.elim-label {
+  font-size: 11px; color: var(--sub); letter-spacing: 1px; white-space: nowrap;
+}
+.elim-label strong { color: var(--text); }
+
+.board-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px; width: 100%;
+}
+
+.char-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  padding: 0;
+  text-align: center; cursor: pointer;
+  transition: transform 0.12s, background 0.15s, border-color 0.15s;
+  position: relative;
+  min-height: 58px;
+  display: flex; align-items: center; justify-content: center;
+  user-select: none;
+  overflow: hidden;
+  touch-action: manipulation;
+}
+.char-card::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: var(--red); opacity: 0.5;
+}
+.char-card:active { transform: scale(0.93); }
+
+.char-card-inner {
+  padding: 10px 6px 8px;
+  width: 100%;
+}
+.char-card-name {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 13px; letter-spacing: 0.5px;
+  line-height: 1.15; color: var(--text);
+  display: block;
+}
+
+.char-card.eliminated {
+  background: var(--elim-bg);
+  border-color: var(--elim-border);
+  cursor: pointer;
+}
+.char-card.eliminated::before { opacity: 0; }
+.char-card.eliminated::after {
+  content: '✕';
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; color: var(--elim-text);
+  font-family: 'Bebas Neue', sans-serif;
+}
+.char-card.eliminated .char-card-name {
+  color: var(--elim-text);
+  text-decoration: line-through;
+  opacity: 0.4;
+}
+
+.board-actions {
+  display: flex; gap: 8px; margin-top: 14px; width: 100%;
+}
+
+.overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.92);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 100; padding: 20px;
+}
+.overlay.hidden { display: none; }
+.modal {
+  background: var(--mid);
+  border: 1px solid var(--card-border);
+  border-top: 3px solid var(--red);
+  padding: 28px 22px; width: 100%; max-width: 340px;
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+}
+.modal-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 30px; letter-spacing: 2px; margin-bottom: 4px; color: var(--text);
+}
+.modal-sub { font-size: 13px; color: var(--sub); margin-bottom: 18px; letter-spacing: 1px; }
+.guess-select {
+  background: var(--dark); border: 1px solid #333;
+  border-bottom: 2px solid var(--red);
+  color: var(--text); font-family: 'Bebas Neue', sans-serif;
+  font-size: 18px; letter-spacing: 1px;
+  padding: 12px 10px; width: 100%;
+  margin-bottom: 18px; outline: none;
+  appearance: none; -webkit-appearance: none;
+}
+.modal-btns { display: flex; gap: 8px; }
+
+.win-wrap { text-align: center; max-width: 320px; }
+.win-label {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 13px; letter-spacing: 8px; color: var(--gold);
+  margin-bottom: 10px;
+}
+.win-exclaim {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(64px, 20vw, 100px);
+  line-height: 0.85; color: var(--text);
+  text-shadow: 4px 4px 0 var(--red-dark);
+  letter-spacing: 4px;
+}
+.win-name {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(28px, 8vw, 44px);
+  color: var(--red); letter-spacing: 3px; margin-bottom: 6px;
+}
+.win-sub {
+  font-size: 13px; color: var(--sub); letter-spacing: 1px;
+  margin-bottom: 36px; line-height: 1.6;
+}
+.win-sub strong { color: var(--gold); }
+
+@keyframes flash-red {
+  0% { background: var(--red); }
+  100% { background: var(--dark); }
+}
+body.wrong-flash { animation: flash-red 0.4s ease-out; }
+</style>
+</head>
+<body>
+
+<div class="screen" id="screen-title">
+  <div style="text-align:center;max-width:320px;">
+    <div class="marvel-banner"><span>MARVEL</span></div>
+    <div class="title-logo">GUESS<br>WHO</div>
+    <div class="title-rule">
+      <div class="title-rule-line"></div>
+      <div class="title-rule-star"></div>
+      <div class="title-rule-line"></div>
+    </div>
+    <p class="title-desc">Two players. One secret hero. Ask questions, eliminate suspects, strike first.</p>
+    <button type="button" class="btn btn-primary" id="btn-assemble" style="margin:0 auto;">Assemble</button>
+  </div>
+</div>
+
+<div class="screen hidden" id="screen-setup">
+  <div class="setup-section">
+    <div class="player-tag">Player 1</div>
+    <p class="setup-label" style="margin-top:12px;">Codename</p>
+    <input class="player-input" id="p1-name" type="text" placeholder="Tony Stark" maxlength="16" autocomplete="off">
+    <div class="player-tag p2">Player 2</div>
+    <p class="setup-label" style="margin-top:12px;">Codename</p>
+    <input class="player-input" id="p2-name" type="text" placeholder="Steve Rogers" maxlength="16" autocomplete="off">
+    <p class="setup-label" style="margin-top:4px;">Characters on Board</p>
+    <div class="size-row">
+      <button type="button" class="size-btn" id="size-20" data-size="20">20</button>
+      <button type="button" class="size-btn active" id="size-24" data-size="24">24</button>
+      <button type="button" class="size-btn" id="size-28" data-size="28">28</button>
+    </div>
+    <button type="button" class="btn btn-primary" id="btn-start" style="margin:0 auto;">Roll Roster</button>
+  </div>
+</div>
+
+<div class="screen hidden" id="screen-secret">
+  <div class="pass-inner">
+    <div class="player-tag" id="secret-player-tag">Player 1</div>
+    <h2 class="pass-heading" id="secret-player-label">AGENT NAME</h2>
+
+    <div class="secret-box">
+      <p class="sb-label">Your Secret Identity</p>
+      <p class="sb-name blurred" id="secret-name-display">Spider-Man</p>
+      <p class="sb-hint" id="secret-hint-text">Tap Reveal to see your character</p>
+    </div>
+
+    <button type="button" class="reveal-btn show-state" id="reveal-toggle-btn">Reveal Identity</button>
+    <button type="button" class="btn btn-ghost" id="secret-continue-btn" disabled
+      style="font-size:17px;padding:13px;letter-spacing:3px;margin:0 auto;">
+      Continue &rarr;
+    </button>
+  </div>
+</div>
+
+<div class="screen hidden" id="screen-handoff">
+  <div class="handoff-inner">
+    <div class="handoff-icon">📲</div>
+    <div class="handoff-title" id="handoff-title">Pass the Phone</div>
+    <p class="handoff-sub" id="handoff-sub">Hand it to <strong>Player 2</strong>.<br>Don't let them see the screen.</p>
+    <button type="button" class="btn btn-primary" id="btn-handoff" style="margin:0 auto;">Ready</button>
+  </div>
+</div>
+
+<div class="screen hidden" id="screen-board" style="justify-content:flex-start;">
+  <div class="board-wrap">
+    <div class="board-header">
+      <div>
+        <div class="board-player-label">NOW PLAYING</div>
+        <div class="board-player-name" id="board-turn-name">AGENT</div>
+      </div>
+      <div class="board-instruct">TAP TO<br>ELIMINATE</div>
+    </div>
+
+    <div class="elim-bar">
+      <span class="elim-label">Eliminated <strong id="elim-counter">0</strong>/<span id="total-counter">24</span></span>
+      <div class="elim-bar-track">
+        <div class="elim-bar-fill" id="elim-bar-fill"></div>
+      </div>
+    </div>
+
+    <div class="board-grid" id="board-grid"></div>
+
+    <div class="board-actions">
+      <button type="button" class="btn btn-primary btn-sm" id="btn-guess" style="flex:2;">⚡ Final Guess</button>
+      <button type="button" class="btn btn-secondary btn-sm" id="btn-end-turn" style="flex:1.2;">End Turn</button>
+      <button type="button" class="btn btn-ghost btn-sm" id="btn-new-game" style="flex:0.8;font-size:12px;">New</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay hidden" id="guess-modal">
+  <div class="modal">
+    <div class="modal-title">Final Guess</div>
+    <div class="modal-sub" id="guess-modal-sub">Who is the enemy agent?</div>
+    <select class="guess-select" id="guess-select"></select>
+    <div class="modal-btns">
+      <button type="button" class="btn btn-primary btn-sm" id="btn-submit-guess" style="flex:2;">Confirm</button>
+      <button type="button" class="btn btn-ghost btn-sm" id="btn-cancel-guess" style="flex:1;">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="screen hidden" id="screen-win">
+  <div class="win-wrap">
+    <div class="win-label">Mission Complete</div>
+    <div class="win-exclaim">WIN!</div>
+    <div class="win-name" id="win-name">PLAYER 1</div>
+    <p class="win-sub">correctly identified <strong id="win-char"></strong></p>
+    <button type="button" class="btn btn-primary" id="btn-play-again" style="margin:0 auto;">Play Again</button>
+  </div>
+</div>
+
+<script>
+const ALL_CHARACTERS = [
+  "Spider-Man","Iron Man","Captain America","Thor","Black Widow","Hulk","Hawkeye",
+  "Black Panther","Doctor Strange","Scarlet Witch","Vision","Ant-Man","Wasp",
+  "Winter Soldier","Falcon","War Machine","Loki","Thanos","Nick Fury",
+  "Rocket","Groot","Star-Lord","Gamora","Drax","Nebula","Mantis","Yondu",
+  "Wolverine","Cyclops","Jean Grey","Storm","Magneto","Professor X","Mystique",
+  "Nightcrawler","Beast","Rogue","Gambit","Deadpool","Cable","Domino",
+  "Psylocke","Bishop","Colossus","Dazzler",
+  "Ghost Rider","Daredevil","Jessica Jones","Luke Cage","Iron Fist","Punisher",
+  "Moon Knight","Echo","Blade","Morbius","Ms. Marvel","She-Hulk","Shang-Chi",
+  "America Chavez","Kate Bishop","Yelena Belova","Red Guardian","Taskmaster",
+  "Kang","Ultron","Red Skull","MODOK","Abomination","Whiplash","Vulture",
+  "Mysterio","Electro","Rhino","Sandman","Venom","Carnage","Mister Sinister",
+  "Apocalypse","Juggernaut","Sabretooth","Silver Surfer","Galactus","Odin","Hela",
+  "Valkyrie","Korg","Adam Warlock","Nova","Captain Marvel","Monica Rambeau",
+  "Spider-Woman","Spider-Gwen","Miles Morales",
+  "Pepper Potts","J. Jonah Jameson","Norman Osborn","Kingpin",
+  "Mr. Fantastic","Invisible Woman","Human Torch","The Thing","Doctor Doom",
+  "Stan Lee"
+];
+
+const state = {
+  p1Name: "Player 1",
+  p2Name: "Player 2",
+  boardSize: 24,
+  characters: [],
+  p1Secret: "",
+  p2Secret: "",
+  boardP1: [],
+  boardP2: [],
+  currentPlayer: 1,
+  secretRevealedOnce: false,
+  secretSetupStep: 1,
+  handoffNext: null,
+  secretVisible: false
+};
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function show(id) {
+  document.querySelectorAll(".screen").forEach((screen) => screen.classList.add("hidden"));
+  document.getElementById(id).classList.remove("hidden");
+}
+
+function setContinueEnabled(enabled) {
+  const contBtn = document.getElementById("secret-continue-btn");
+  contBtn.disabled = !enabled;
+}
+
+function showTitle() {
+  state.handoffNext = null;
+  state.secretVisible = false;
+  state.secretRevealedOnce = false;
+  show("screen-title");
+}
+
+function showSetup() {
+  show("screen-setup");
+}
+
+function setSize(n) {
+  state.boardSize = n;
+  document.querySelectorAll(".size-btn").forEach((btn) => {
+    btn.classList.toggle("active", Number(btn.dataset.size) === n);
+  });
+}
+
+function getName(id, fallback) {
+  return document.getElementById(id).value.trim() || fallback;
+}
+
+function pickSecrets(characters) {
+  const pool = shuffle(characters);
+  let p1Secret = pool[0];
+  let p2Secret = pool[1];
+  if (p1Secret === p2Secret) {
+    p2Secret = pool[2] || pool[0];
+  }
+  return { p1Secret, p2Secret };
+}
+
+function startGame() {
+  state.p1Name = getName("p1-name", "Player 1");
+  state.p2Name = getName("p2-name", "Player 2");
+  const pool = shuffle(ALL_CHARACTERS);
+  state.characters = pool.slice(0, state.boardSize);
+  const secrets = pickSecrets(state.characters);
+  state.p1Secret = secrets.p1Secret;
+  state.p2Secret = secrets.p2Secret;
+  state.boardP1 = new Array(state.boardSize).fill(false);
+  state.boardP2 = new Array(state.boardSize).fill(false);
+  state.currentPlayer = 1;
+  showSecretScreen(1);
+}
+
+function showSecretScreen(playerNum) {
+  state.secretRevealedOnce = false;
+  state.secretVisible = false;
+
+  const name = playerNum === 1 ? state.p1Name : state.p2Name;
+  const secret = playerNum === 1 ? state.p1Secret : state.p2Secret;
+  const tag = document.getElementById("secret-player-tag");
+
+  tag.textContent = "Player " + playerNum;
+  tag.className = "player-tag" + (playerNum === 2 ? " p2" : "");
+  document.getElementById("secret-player-label").textContent = name.toUpperCase();
+
+  const nameEl = document.getElementById("secret-name-display");
+  nameEl.textContent = secret;
+  nameEl.classList.add("blurred");
+
+  const revBtn = document.getElementById("reveal-toggle-btn");
+  revBtn.textContent = "Reveal Identity";
+  revBtn.className = "reveal-btn show-state";
+  document.getElementById("secret-hint-text").textContent = "Tap Reveal to see your character";
+  setContinueEnabled(false);
+
+  state.secretSetupStep = playerNum;
+  show("screen-secret");
+}
+
+function toggleReveal() {
+  const nameEl = document.getElementById("secret-name-display");
+  const revBtn = document.getElementById("reveal-toggle-btn");
+  const hintEl = document.getElementById("secret-hint-text");
+
+  state.secretVisible = !state.secretVisible;
+
+  if (state.secretVisible) {
+    nameEl.classList.remove("blurred");
+    revBtn.textContent = "Hide Identity";
+    revBtn.className = "reveal-btn hide-state";
+    hintEl.textContent = "Make sure nobody else is looking!";
+    state.secretRevealedOnce = true;
+    setContinueEnabled(true);
+  } else {
+    nameEl.classList.add("blurred");
+    revBtn.textContent = "Reveal Identity";
+    revBtn.className = "reveal-btn show-state";
+    hintEl.textContent = state.secretRevealedOnce
+      ? "Identity hidden. Tap Continue when ready."
+      : "Tap Reveal to see your character";
+  }
+}
+
+function onSecretContinue() {
+  const contBtn = document.getElementById("secret-continue-btn");
+  if (contBtn.disabled) return;
+
+  document.getElementById("secret-name-display").classList.add("blurred");
+  state.secretVisible = false;
+
+  if (state.secretSetupStep === 1) {
+    document.getElementById("handoff-title").textContent = "Pass to " + state.p2Name;
+    document.getElementById("handoff-sub").innerHTML =
+      "Hand the phone to <strong>" + state.p2Name + "</strong>.<br>Don't let them see the screen.";
+    state.handoffNext = "p2secret";
+  } else {
+    document.getElementById("handoff-title").textContent = "Pass to " + state.p1Name;
+    document.getElementById("handoff-sub").innerHTML =
+      "Hand the phone to <strong>" + state.p1Name + "</strong>.<br>They go first!";
+    state.handoffNext = "startboard";
+  }
+  show("screen-handoff");
+}
+
+function onHandoffContinue() {
+  if (state.handoffNext === "p2secret") {
+    showSecretScreen(2);
+  } else if (state.handoffNext === "startboard" || state.handoffNext === "boardturn") {
+    renderBoard();
+    show("screen-board");
+  }
+  state.handoffNext = null;
+}
+
+function renderBoard() {
+  const p = state.currentPlayer;
+  const name = p === 1 ? state.p1Name : state.p2Name;
+  const elimArr = p === 1 ? state.boardP1 : state.boardP2;
+
+  document.getElementById("board-turn-name").textContent = name.toUpperCase();
+  document.getElementById("total-counter").textContent = state.boardSize;
+
+  const grid = document.getElementById("board-grid");
+  grid.innerHTML = "";
+
+  state.characters.forEach((char, i) => {
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = "char-card" + (elimArr[i] ? " eliminated" : "");
+    card.setAttribute("aria-label", char + (elimArr[i] ? " eliminated" : ""));
+
+    const inner = document.createElement("div");
+    inner.className = "char-card-inner";
+    const nameEl = document.createElement("span");
+    nameEl.className = "char-card-name";
+    nameEl.textContent = char;
+    inner.appendChild(nameEl);
+    card.appendChild(inner);
+    card.addEventListener("click", () => toggleElim(i));
+    grid.appendChild(card);
+  });
+
+  updateElimBar();
+}
+
+function toggleElim(idx) {
+  const p = state.currentPlayer;
+  if (p === 1) state.boardP1[idx] = !state.boardP1[idx];
+  else state.boardP2[idx] = !state.boardP2[idx];
+
+  const elimArr = p === 1 ? state.boardP1 : state.boardP2;
+  const cards = document.querySelectorAll("#board-grid .char-card");
+  if (cards[idx]) cards[idx].classList.toggle("eliminated", elimArr[idx]);
+  updateElimBar();
+}
+
+function updateElimBar() {
+  const p = state.currentPlayer;
+  const arr = p === 1 ? state.boardP1 : state.boardP2;
+  const count = arr.filter(Boolean).length;
+  document.getElementById("elim-counter").textContent = count;
+  document.getElementById("elim-bar-fill").style.width = ((count / state.boardSize) * 100) + "%";
+}
+
+function endTurn() {
+  const nextPlayer = state.currentPlayer === 1 ? 2 : 1;
+  const nextName = nextPlayer === 1 ? state.p1Name : state.p2Name;
+  document.getElementById("handoff-title").textContent = "Pass to " + nextName;
+  document.getElementById("handoff-sub").innerHTML =
+    "Hand the phone to <strong>" + nextName + "</strong>.<br>Don't let them see the screen.";
+  state.currentPlayer = nextPlayer;
+  state.handoffNext = "boardturn";
+  show("screen-handoff");
+}
+
+function openGuessModal() {
+  const p = state.currentPlayer;
+  const myName = p === 1 ? state.p1Name : state.p2Name;
+  const theirName = p === 1 ? state.p2Name : state.p1Name;
+  document.getElementById("guess-modal-sub").textContent =
+    myName + ": who is " + theirName + "'s secret identity?";
+
+  const sel = document.getElementById("guess-select");
+  sel.innerHTML = "";
+  state.characters.forEach((char) => {
+    const opt = document.createElement("option");
+    opt.value = char;
+    opt.textContent = char;
+    sel.appendChild(opt);
+  });
+
+  document.getElementById("guess-modal").classList.remove("hidden");
+}
+
+function closeGuessModal() {
+  document.getElementById("guess-modal").classList.add("hidden");
+}
+
+function flashWrongGuess() {
+  document.body.classList.add("wrong-flash");
+  window.setTimeout(() => document.body.classList.remove("wrong-flash"), 400);
+}
+
+function submitGuess() {
+  const guess = document.getElementById("guess-select").value;
+  const p = state.currentPlayer;
+  const correct = p === 1 ? state.p2Secret : state.p1Secret;
+  const guesserName = p === 1 ? state.p1Name : state.p2Name;
+  closeGuessModal();
+
+  if (guess === correct) {
+    document.getElementById("win-name").textContent = guesserName.toUpperCase();
+    document.getElementById("win-char").textContent = correct;
+    show("screen-win");
+    return;
+  }
+
+  flashWrongGuess();
+  const nextPlayer = p === 1 ? 2 : 1;
+  const nextName = nextPlayer === 1 ? state.p1Name : state.p2Name;
+  document.getElementById("handoff-title").textContent = "Wrong Guess!";
+  document.getElementById("handoff-sub").innerHTML =
+    "It wasn't <strong>" + guess + "</strong>.<br>Pass to <strong>" + nextName + "</strong>.";
+  state.currentPlayer = nextPlayer;
+  state.handoffNext = "boardturn";
+  show("screen-handoff");
+}
+
+function confirmNewGame() {
+  if (window.confirm("Start a new game?")) showTitle();
+}
+
+document.getElementById("btn-assemble").addEventListener("click", showSetup);
+document.getElementById("btn-start").addEventListener("click", startGame);
+document.getElementById("reveal-toggle-btn").addEventListener("click", toggleReveal);
+document.getElementById("secret-continue-btn").addEventListener("click", onSecretContinue);
+document.getElementById("btn-handoff").addEventListener("click", onHandoffContinue);
+document.getElementById("btn-guess").addEventListener("click", openGuessModal);
+document.getElementById("btn-end-turn").addEventListener("click", endTurn);
+document.getElementById("btn-new-game").addEventListener("click", confirmNewGame);
+document.getElementById("btn-submit-guess").addEventListener("click", submitGuess);
+document.getElementById("btn-cancel-guess").addEventListener("click", closeGuessModal);
+document.getElementById("btn-play-again").addEventListener("click", showTitle);
+
+document.querySelectorAll(".size-btn").forEach((btn) => {
+  btn.addEventListener("click", () => setSize(Number(btn.dataset.size)));
+});
+
+document.getElementById("guess-modal").addEventListener("click", (event) => {
+  if (event.target.id === "guess-modal") closeGuessModal();
+});
+
+["p1-name", "p2-name"].forEach((id) => {
+  document.getElementById(id).addEventListener("keydown", (event) => {
+    if (event.key === "Enter") startGame();
+  });
+});
+</script>
+</body>
+</html>
