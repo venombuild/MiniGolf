@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <title>Neon Dodge</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app">
+    <header>
+      <div class="score-box">
+        <span class="label">Score</span>
+        <span id="score">0</span>
+      </div>
+      <div class="score-box">
+        <span class="label">Best</span>
+        <span id="best">0</span>
+      </div>
+    </header>
+
+    <canvas id="game" touch-action="none"></canvas>
+
+    <div id="overlay" class="visible">
+      <div class="panel">
+        <p class="eyebrow">MobileGame</p>
+        <h1>Neon Dodge</h1>
+        <p class="subtitle">Tap the left or right side of the screen to move. Avoid the falling blocks.</p>
+        <button id="play-btn" type="button">Tap to Play</button>
+      </div>
+    </div>
+
+    <footer>
+      <button id="left-btn" type="button" aria-label="Move left">◀</button>
+      <button id="right-btn" type="button" aria-label="Move right">▶</button>
+    </footer>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
