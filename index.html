@@ -680,11 +680,11 @@ function setContinueEnabled(enabled) {
 
 const GAMES = [
   { id: "guess-who", name: "Marvel Guess Who", subtitle: "Pass & Play", icon: "🦸", available: true },
-  { id: "placeholder-2", name: "Game 02", subtitle: "Coming Soon", icon: "🎮", available: false },
+  { id: "marvel-brawl", name: "Marvel Brawl", subtitle: "Arena Fight", icon: "⚔️", available: true },
   { id: "placeholder-3", name: "Game 03", subtitle: "Coming Soon", icon: "🎯", available: false },
   { id: "placeholder-4", name: "Game 04", subtitle: "Coming Soon", icon: "🃏", available: false },
   { id: "placeholder-5", name: "Game 05", subtitle: "Coming Soon", icon: "🎲", available: false },
-  { id: "placeholder-6", name: "Game 06", subtitle: "Coming Soon", icon: "⚡", available: false }
+  { id: "placeholder-6", name: "Game 06", subtitle: "Coming Soon", icon: "🎮", available: false }
 ];
 
 function showMenu() {
@@ -728,6 +728,7 @@ function renderMenu() {
 
 function openGame(id) {
   if (id === "guess-who") showTitle();
+  if (id === "marvel-brawl") window.location.href = "marvel-brawl.html";
 }
 
 function showSetup() {
