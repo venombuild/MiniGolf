@@ -78,10 +78,9 @@ body::before {
   width: 100%; max-width: 300px;
 }
 .btn:active { transform: scale(0.97); }
-.btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+.btn:disabled { opacity: 0.35; cursor: not-allowed; }
 .btn-primary { background: var(--red); color: white; clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px)); }
 .btn-ghost { background: transparent; color: var(--sub); border: 1px solid #333; margin-top: 10px; }
-.btn-sm { font-size: 15px; padding: 10px 14px; letter-spacing: 2px; max-width: none; }
 
 .player-tag {
   display: inline-block;
@@ -137,21 +136,15 @@ body::before {
   border-top: 3px solid var(--fighter-color, var(--red));
   padding: 10px 12px;
 }
-.fighter-hud.active { box-shadow: 0 0 0 1px var(--gold); }
 .fighter-hud-name { font-family: 'Bebas Neue', sans-serif; font-size: 16px; letter-spacing: 1px; }
 .fighter-hud-player { font-size: 10px; color: var(--sub); letter-spacing: 2px; text-transform: uppercase; }
-.hp-bar { height: 8px; background: #222; border-radius: 4px; overflow: hidden; margin: 8px 0 4px; }
-.hp-fill { height: 100%; background: var(--fighter-color, var(--red)); transition: width 0.3s; }
+.hp-bar { height: 10px; background: #222; border-radius: 5px; overflow: hidden; margin: 8px 0 4px; }
+.hp-fill { height: 100%; background: var(--fighter-color, var(--red)); transition: width 0.2s; }
 .hp-text { font-size: 11px; color: var(--sub); }
-.cooldown-text { font-size: 10px; color: var(--gold); letter-spacing: 1px; margin-top: 2px; }
-.shield-text { font-size: 10px; color: #5cf0ff; letter-spacing: 1px; }
+.power-meter { height: 4px; background: #1a1a1a; border-radius: 2px; overflow: hidden; margin-top: 6px; }
+.power-fill { height: 100%; background: var(--gold); transition: width 0.05s linear; }
 
-.arena-wrap {
-  width: 100%;
-  max-width: 340px;
-  margin: 0 auto;
-  position: relative;
-}
+.arena-wrap { width: 100%; max-width: 340px; margin: 0 auto; }
 
 #arena-canvas {
   display: block;
@@ -160,37 +153,22 @@ body::before {
   border-radius: 50%;
   background: #111;
   border: 2px solid #333;
-  touch-action: none;
 }
 
-.phase-banner {
+.status-banner {
   text-align: center;
   font-family: 'Bebas Neue', sans-serif;
   font-size: 14px;
   letter-spacing: 4px;
   color: var(--gold);
-  min-height: 20px;
 }
-
-.action-panel {
-  background: var(--mid);
-  border: 1px solid var(--card-border);
-  padding: 12px;
-}
-.action-title {
-  font-family: 'Bebas Neue', sans-serif;
-  font-size: 14px; letter-spacing: 3px;
-  color: var(--gold); margin-bottom: 8px;
-}
-.action-row { display: flex; gap: 8px; }
-.action-row .btn { flex: 1; }
 
 .battle-log {
   background: #111;
   border: 1px solid #222;
   padding: 10px 12px;
-  min-height: 64px;
-  max-height: 80px;
+  min-height: 56px;
+  max-height: 72px;
   overflow-y: auto;
   font-size: 13px;
   color: var(--sub);
@@ -217,7 +195,7 @@ body::before {
   <div style="text-align:center;max-width:320px;">
     <button type="button" class="back-btn" id="btn-hub">&larr; Hub</button>
     <div class="title-logo">MARVEL<br>BRAWL</div>
-    <p class="title-sub">Heroes bounce around the arena each turn — then unleash their power. Last one standing wins.</p>
+    <p class="title-sub">Pick your hero and watch the fight. Balls bounce, powers fire on their own — last hero standing wins.</p>
     <button type="button" class="btn btn-primary" id="btn-fight">Enter Arena</button>
   </div>
 </div>
@@ -243,24 +221,11 @@ body::before {
 
 <div class="screen hidden" id="screen-battle" style="justify-content:flex-start;padding-top:14px;">
   <div class="battle-wrap">
-    <button type="button" class="back-btn" id="btn-quit">&larr; Quit</button>
     <div class="hud-row" id="hud-row"></div>
-
     <div class="arena-wrap">
       <canvas id="arena-canvas" width="340" height="340"></canvas>
     </div>
-
-    <div class="phase-banner" id="phase-banner">DRIFTING...</div>
-
-    <div class="action-panel">
-      <div class="action-title" id="action-title">Player 1's Turn</div>
-      <div class="action-row">
-        <button type="button" class="btn btn-sm btn-primary" id="btn-power" disabled>Power</button>
-        <button type="button" class="btn btn-sm btn-ghost" id="btn-end-turn" disabled>End Turn</button>
-      </div>
-      <p style="font-size:11px;color:var(--sub);margin-top:8px;letter-spacing:1px;" id="action-hint">Balls are bouncing...</p>
-    </div>
-
+    <div class="status-banner" id="status-banner">FIGHT!</div>
     <div class="battle-log" id="battle-log"></div>
   </div>
 </div>
@@ -269,7 +234,7 @@ body::before {
   <div class="win-wrap">
     <div class="win-title">KO!</div>
     <div class="title-logo" id="win-hero" style="font-size:48px;margin-bottom:8px;">HULK</div>
-    <p class="win-sub"><strong id="win-player"></strong> wins the brawl!</p>
+    <p class="win-sub"><strong id="win-player"></strong> wins!</p>
     <button type="button" class="btn btn-primary" id="btn-rematch">Rematch</button>
     <button type="button" class="btn btn-ghost" id="btn-win-hub">Back to Hub</button>
   </div>
@@ -279,42 +244,39 @@ body::before {
 const BALL_R = 18;
 const ARENA_R = 150;
 const CENTER = 170;
-const DRIFT_SPEED = 200;
-const DRIFT_TIME = 2.4;
-const DRIFT_FRICTION = 0.9992;
+const BALL_SPEED = 165;
 
 const HEROES = {
   ironman: {
     id: "ironman", name: "Iron Man", icon: "🤖", color: "#c41e2a", hp: 100,
-    power: { name: "Unibeam", damage: 30, range: 130, cooldown: 3, beam: true }
+    power: { name: "Unibeam", damage: 12, range: 140, interval: 3.2, beam: true }
   },
   cap: {
     id: "cap", name: "Captain America", icon: "🛡️", color: "#1e4a8c", hp: 115,
-    power: { name: "Shield Throw", damage: 25, range: 90, cooldown: 2, shield: 15 }
+    power: { name: "Shield Throw", damage: 10, range: 95, interval: 2.4, shield: 8 }
   },
   thor: {
     id: "thor", name: "Thor", icon: "⚡", color: "#6b4ce6", hp: 105,
-    power: { name: "Lightning", damage: 22, range: 9999, cooldown: 3, global: true }
+    power: { name: "Lightning", damage: 9, range: 9999, interval: 2.8, global: true }
   },
   hulk: {
     id: "hulk", name: "Hulk", icon: "💪", color: "#3d8b37", hp: 135,
-    power: { name: "Smash", damage: 45, range: 50, cooldown: 4 }
+    power: { name: "Smash", damage: 18, range: 55, interval: 3.8 }
   }
 };
 
 const state = {
-  p1Hero: null, p2Hero: null,
+  p1Hero: null,
+  p2Hero: null,
   fighters: [],
-  currentPlayer: 1,
-  turn: 1,
-  phase: "drift",
   handoffNext: null,
   pickStep: 1,
   selectedHero: null,
   log: [],
-  driftTimer: 0,
+  effects: [],
+  running: false,
   animId: null,
-  effects: []
+  elapsed: 0
 };
 
 const canvas = document.getElementById("arena-canvas");
@@ -326,7 +288,6 @@ function show(id) {
 }
 
 function getFighter(p) { return state.fighters.find((f) => f.player === p); }
-function getOpponent(p) { return getFighter(p === 1 ? 2 : 1); }
 function getHeroDef(id) { return HEROES[id]; }
 
 function dist(a, b) {
@@ -337,13 +298,13 @@ function dist(a, b) {
 
 function addLog(msg) {
   state.log.unshift(msg);
-  if (state.log.length > 4) state.log.pop();
+  if (state.log.length > 3) state.log.pop();
   document.getElementById("battle-log").innerHTML = state.log.map((l) => "<div>" + l + "</div>").join("");
 }
 
-function randomDriftVelocity() {
+function randomVelocity() {
   const angle = Math.random() * Math.PI * 2;
-  return { vx: Math.cos(angle) * DRIFT_SPEED, vy: Math.sin(angle) * DRIFT_SPEED };
+  return { vx: Math.cos(angle) * BALL_SPEED, vy: Math.sin(angle) * BALL_SPEED };
 }
 
 function resolveCircleWall(ball) {
@@ -360,7 +321,9 @@ function resolveCircleWall(ball) {
     const dot = ball.vx * nx + ball.vy * ny;
     ball.vx -= 2 * dot * nx;
     ball.vy -= 2 * dot * ny;
-    ball.bounces += 1;
+    const speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy) || 1;
+    ball.vx = (ball.vx / speed) * BALL_SPEED;
+    ball.vy = (ball.vy / speed) * BALL_SPEED;
   }
 }
 
@@ -386,7 +349,87 @@ function resolveBallCollision(a, b) {
       b.vx += dvn * nx;
       b.vy += dvn * ny;
     }
+
+    const sa = Math.sqrt(a.vx * a.vx + a.vy * a.vy) || 1;
+    const sb = Math.sqrt(b.vx * b.vx + b.vy * b.vy) || 1;
+    a.vx = (a.vx / sa) * BALL_SPEED;
+    a.vy = (a.vy / sa) * BALL_SPEED;
+    b.vx = (b.vx / sb) * BALL_SPEED;
+    b.vy = (b.vy / sb) * BALL_SPEED;
   }
+}
+
+function canHit(attacker, defender) {
+  const p = getHeroDef(attacker.heroId).power;
+  if (p.global) return true;
+  return dist(attacker, defender) <= p.range;
+}
+
+function firePower(attacker, defender) {
+  const hero = getHeroDef(attacker.heroId);
+  const power = hero.power;
+  if (!canHit(attacker, defender)) return false;
+
+  let damage = power.damage;
+
+  if (power.beam) {
+    state.effects.push({ type: "beam", until: state.elapsed + 0.35, x1: attacker.x, y1: attacker.y, x2: defender.x, y2: defender.y });
+  } else if (power.global) {
+    state.effects.push({ type: "lightning", until: state.elapsed + 0.35, x1: attacker.x, y1: attacker.y, x2: defender.x, y2: defender.y });
+  } else if (power.name === "Smash") {
+    state.effects.push({ type: "smash", until: state.elapsed + 0.3, x: defender.x, y: defender.y, r: 38 });
+  } else {
+    state.effects.push({ type: "beam", until: state.elapsed + 0.3, x1: attacker.x, y1: attacker.y, x2: defender.x, y2: defender.y });
+  }
+
+  if (defender.shield > 0) {
+    const blocked = Math.min(defender.shield, damage);
+    damage -= blocked;
+    defender.shield -= blocked;
+  }
+
+  defender.hp = Math.max(0, defender.hp - damage);
+  attacker.powerTimer = 0;
+  if (power.shield) attacker.shield = power.shield;
+
+  addLog(hero.icon + " <strong>" + power.name + "</strong> → " + damage + " dmg");
+
+  if (defender.hp <= 0) {
+    endBattle(attacker);
+    return true;
+  }
+  return true;
+}
+
+function endBattle(winner) {
+  state.running = false;
+  if (state.animId) cancelAnimationFrame(state.animId);
+  const hero = getHeroDef(winner.heroId);
+  document.getElementById("win-hero").textContent = hero.name.toUpperCase();
+  document.getElementById("win-player").textContent = winner.name;
+  show("screen-win");
+}
+
+function updateHud() {
+  const hud = document.getElementById("hud-row");
+  hud.innerHTML = "";
+
+  state.fighters.forEach((f) => {
+    const h = getHeroDef(f.heroId);
+    const pct = Math.max(0, (f.hp / f.maxHp) * 100);
+    const charge = Math.min(100, (f.powerTimer / h.power.interval) * 100);
+
+    const div = document.createElement("div");
+    div.className = "fighter-hud";
+    div.style.setProperty("--fighter-color", h.color);
+    div.innerHTML =
+      '<div class="fighter-hud-player">Player ' + f.player + "</div>" +
+      '<div class="fighter-hud-name">' + h.icon + " " + h.name + "</div>" +
+      '<div class="hp-bar"><div class="hp-fill" style="width:' + pct + '%"></div></div>' +
+      '<div class="hp-text">' + Math.ceil(f.hp) + " HP</div>" +
+      '<div class="power-meter"><div class="power-fill" style="width:' + charge + '%"></div></div>';
+    hud.appendChild(div);
+  });
 }
 
 function drawArena() {
@@ -403,34 +446,33 @@ function drawArena() {
   ctx.lineWidth = 3;
   ctx.stroke();
 
-  ctx.strokeStyle = "rgba(255,255,255,0.04)";
-  ctx.lineWidth = 1;
-  for (let i = 1; i <= 3; i += 1) {
-    ctx.beginPath();
-    ctx.arc(CENTER, CENTER, ARENA_R * (i / 4), 0, Math.PI * 2);
-    ctx.stroke();
-  }
-
+  state.effects = state.effects.filter((fx) => fx.until > state.elapsed);
   state.effects.forEach((fx) => {
     if (fx.type === "beam") {
-      ctx.strokeStyle = "rgba(232,25,44,0.85)";
-      ctx.lineWidth = 4;
+      ctx.strokeStyle = "rgba(232,25,44,0.9)";
+      ctx.lineWidth = 5;
+      ctx.shadowColor = "#E8192C";
+      ctx.shadowBlur = 12;
       ctx.beginPath();
       ctx.moveTo(fx.x1, fx.y1);
       ctx.lineTo(fx.x2, fx.y2);
       ctx.stroke();
+      ctx.shadowBlur = 0;
     }
     if (fx.type === "lightning") {
-      ctx.strokeStyle = "rgba(107,76,230,0.9)";
-      ctx.lineWidth = 3;
+      ctx.strokeStyle = "rgba(140,120,255,0.95)";
+      ctx.lineWidth = 4;
       ctx.beginPath();
       ctx.moveTo(fx.x1, fx.y1);
+      const midX = (fx.x1 + fx.x2) / 2 + (Math.random() - 0.5) * 20;
+      const midY = (fx.y1 + fx.y2) / 2 + (Math.random() - 0.5) * 20;
+      ctx.lineTo(midX, midY);
       ctx.lineTo(fx.x2, fx.y2);
       ctx.stroke();
     }
     if (fx.type === "smash") {
-      ctx.strokeStyle = "rgba(61,139,55,0.8)";
-      ctx.lineWidth = 2;
+      ctx.strokeStyle = "rgba(61,139,55,0.85)";
+      ctx.lineWidth = 3;
       ctx.beginPath();
       ctx.arc(fx.x, fx.y, fx.r, 0, Math.PI * 2);
       ctx.stroke();
@@ -439,12 +481,11 @@ function drawArena() {
 
   state.fighters.forEach((f) => {
     const hero = getHeroDef(f.heroId);
-    const isActive = f.player === state.currentPlayer;
 
     ctx.beginPath();
     ctx.arc(f.x, f.y, BALL_R + 3, 0, Math.PI * 2);
     ctx.strokeStyle = f.player === 1 ? "#E8192C" : "#1e6fd4";
-    ctx.lineWidth = isActive ? 4 : 2;
+    ctx.lineWidth = 3;
     ctx.stroke();
 
     ctx.beginPath();
@@ -452,274 +493,104 @@ function drawArena() {
     ctx.fillStyle = hero.color;
     ctx.fill();
 
+    const speed = Math.sqrt(f.vx * f.vx + f.vy * f.vy);
+    if (speed > 5) {
+      const nx = f.vx / speed;
+      const ny = f.vy / speed;
+      ctx.strokeStyle = "rgba(255,255,255,0.2)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(f.x - nx * 20, f.y - ny * 20);
+      ctx.lineTo(f.x, f.y);
+      ctx.stroke();
+    }
+
     ctx.font = "20px sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(hero.icon, f.x, f.y + 1);
-
-    if (state.phase === "drift" && (Math.abs(f.vx) + Math.abs(f.vy) > 10)) {
-      const speed = Math.sqrt(f.vx * f.vx + f.vy * f.vy);
-      const len = 14 + speed * 0.04;
-      const nx = f.vx / speed;
-      const ny = f.vy / speed;
-      ctx.strokeStyle = "rgba(255,255,255,0.25)";
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(f.x - nx * len, f.y - ny * len);
-      ctx.lineTo(f.x, f.y);
-      ctx.stroke();
-    }
   });
 }
 
-function updateHud() {
-  const current = getFighter(state.currentPlayer);
-  const opponent = getOpponent(state.currentPlayer);
-
-  document.getElementById("action-title").textContent = current.name + "'s Turn · Round " + state.turn;
-
-  const hud = document.getElementById("hud-row");
-  hud.innerHTML = "";
-  [current, opponent].forEach((f) => {
-    const h = getHeroDef(f.heroId);
-    const div = document.createElement("div");
-    div.className = "fighter-hud" + (f.player === state.currentPlayer ? " active" : "");
-    div.style.setProperty("--fighter-color", h.color);
-    const pct = Math.max(0, (f.hp / f.maxHp) * 100);
-    div.innerHTML =
-      '<div class="fighter-hud-player">Player ' + f.player + "</div>" +
-      '<div class="fighter-hud-name">' + h.icon + " " + h.name + "</div>" +
-      '<div class="hp-bar"><div class="hp-fill" style="width:' + pct + '%"></div></div>' +
-      '<div class="hp-text">' + f.hp + " / " + f.maxHp + " HP</div>" +
-      (f.shield > 0 ? '<div class="shield-text">🛡 ' + f.shield + "</div>" : "") +
-      (f.player === state.currentPlayer && f.cooldown > 0
-        ? '<div class="cooldown-text">⏳ ' + h.power.name + " in " + f.cooldown + "</div>"
-        : "");
-    hud.appendChild(div);
-  });
-}
-
-function setActionUI() {
-  const current = getFighter(state.currentPlayer);
-  const opponent = getOpponent(state.currentPlayer);
-  const hero = getHeroDef(current.heroId);
-  const inRange = canUsePower(current, opponent);
-
-  const powerBtn = document.getElementById("btn-power");
-  const endBtn = document.getElementById("btn-end-turn");
-  const hint = document.getElementById("action-hint");
-  const banner = document.getElementById("phase-banner");
-
-  if (state.phase === "drift") {
-    banner.textContent = "DRIFTING...";
-    powerBtn.disabled = true;
-    endBtn.disabled = true;
-    powerBtn.textContent = hero.power.name;
-    hint.textContent = "Balls bounce off the walls — hold tight!";
-    return;
-  }
-
-  banner.textContent = "USE YOUR MOVE";
-  endBtn.disabled = false;
-  powerBtn.textContent = hero.power.name;
-  powerBtn.disabled = current.cooldown > 0 || current.usedPowerThisTurn;
-
-  if (current.cooldown > 0) {
-    hint.textContent = "Power recharging (" + current.cooldown + " turns left). End turn or wait.";
-  } else if (current.usedPowerThisTurn) {
-    hint.textContent = "Power used! End your turn.";
-  } else if (inRange) {
-    hint.textContent = "Enemy in range — fire your power!";
-  } else {
-    hint.textContent = "Enemy out of range after the drift. End turn or skip attack.";
-  }
-
-  updateHud();
-}
-
-function canUsePower(attacker, defender) {
-  const p = getHeroDef(attacker.heroId).power;
-  if (p.global) return true;
-  return dist(attacker, defender) <= p.range;
-}
-
-function startDriftPhase() {
-  state.phase = "drift";
-  state.driftTimer = DRIFT_TIME;
-  state.effects = [];
-
-  const active = getFighter(state.currentPlayer);
-  const other = getOpponent(state.currentPlayer);
-
-  const activeVel = randomDriftVelocity();
-  active.vx = activeVel.vx;
-  active.vy = activeVel.vy;
-  active.bounces = 0;
-
-  const otherVel = randomDriftVelocity();
-  other.vx = otherVel.vx * 0.85;
-  other.vy = otherVel.vy * 0.85;
-
-  setActionUI();
-  if (state.animId) cancelAnimationFrame(state.animId);
-  let last = performance.now();
-  state.animId = requestAnimationFrame(function tick(now) {
-    const dt = Math.min(0.033, (now - last) / 1000);
-    last = now;
-    physicsStep(dt);
-    drawArena();
-    if (state.phase === "drift") state.animId = requestAnimationFrame(tick);
-  });
-}
-
-function physicsStep(dt) {
-  state.driftTimer -= dt;
+function battleStep(dt) {
+  state.elapsed += dt;
   const f1 = state.fighters[0];
   const f2 = state.fighters[1];
 
   [f1, f2].forEach((ball) => {
     ball.x += ball.vx * dt;
     ball.y += ball.vy * dt;
-    ball.vx *= DRIFT_FRICTION;
-    ball.vy *= DRIFT_FRICTION;
     resolveCircleWall(ball);
   });
-
   resolveBallCollision(f1, f2);
 
-  const speed1 = Math.sqrt(f1.vx * f1.vx + f1.vy * f1.vy);
-  const speed2 = Math.sqrt(f2.vx * f2.vx + f2.vy * f2.vy);
+  [f1, f2].forEach((fighter) => {
+    const opponent = fighter === f1 ? f2 : f1;
+    const hero = getHeroDef(fighter.heroId);
+    fighter.powerTimer += dt;
 
-  if (state.driftTimer <= 0 || (speed1 < 25 && speed2 < 25)) {
-    f1.vx = 0; f1.vy = 0;
-    f2.vx = 0; f2.vy = 0;
-    f1.lastDir = { x: f1.x - CENTER, y: f1.y - CENTER };
-    f2.lastDir = { x: f2.x - CENTER, y: f2.y - CENTER };
-    endDriftPhase();
-  }
-}
-
-function endDriftPhase() {
-  state.phase = "action";
-  const active = getFighter(state.currentPlayer);
-  addLog("<strong>" + active.name + "</strong> stopped drifting — choose your move!");
-  setActionUI();
-  drawArena();
-}
-
-function usePower() {
-  if (state.phase !== "action") return;
-  const attacker = getFighter(state.currentPlayer);
-  const defender = getOpponent(state.currentPlayer);
-  const hero = getHeroDef(attacker.heroId);
-  const power = hero.power;
-
-  if (attacker.cooldown > 0 || attacker.usedPowerThisTurn) return;
-  if (!canUsePower(attacker, defender)) {
-    addLog("Out of range! The drift left you too far.");
-    return;
-  }
-
-  let damage = power.damage;
-
-  if (power.beam) {
-    state.effects.push({
-      type: "beam", life: 0.5,
-      x1: attacker.x, y1: attacker.y,
-      x2: defender.x, y2: defender.y
-    });
-  }
-  if (power.global) {
-    state.effects.push({
-      type: "lightning", life: 0.5,
-      x1: attacker.x, y1: attacker.y,
-      x2: defender.x, y2: defender.y
-    });
-  }
-  if (power.name === "Smash") {
-    state.effects.push({ type: "smash", life: 0.4, x: defender.x, y: defender.y, r: 36 });
-  }
-
-  if (defender.shield > 0) {
-    const blocked = Math.min(defender.shield, damage);
-    damage -= blocked;
-    defender.shield -= blocked;
-    addLog("Shield blocked <strong>" + blocked + "</strong>!");
-  }
-
-  defender.hp = Math.max(0, defender.hp - damage);
-  attacker.cooldown = power.cooldown;
-  attacker.usedPowerThisTurn = true;
-  if (power.shield) attacker.shield = power.shield;
-
-  addLog("<strong>" + hero.name + "</strong> — " + power.name + "! <strong>" + damage + "</strong> dmg");
-
-  drawArena();
-  setTimeout(() => { state.effects = []; drawArena(); }, 500);
-
-  if (defender.hp <= 0) {
-    document.getElementById("win-hero").textContent = hero.name.toUpperCase();
-    document.getElementById("win-player").textContent = attacker.name;
-    if (state.animId) cancelAnimationFrame(state.animId);
-    show("screen-win");
-    return;
-  }
-
-  setActionUI();
-}
-
-function beginTurn(showPass) {
-  const fighter = getFighter(state.currentPlayer);
-  fighter.usedPowerThisTurn = false;
-  if (fighter.cooldown > 0) fighter.cooldown -= 1;
-
-  if (showPass) {
-    const opp = getOpponent(state.currentPlayer);
-    showHandoff(
-      "Pass to " + fighter.name,
-      "Hand the phone to <strong>" + fighter.name + "</strong>.<br>Don't let " + opp.name + " see!",
-      "resume"
-    );
-    return;
-  }
+    if (fighter.powerTimer >= hero.power.interval && canHit(fighter, opponent)) {
+      if (firePower(fighter, opponent)) {
+        if (!state.running) return;
+      }
+    }
+  });
 
   updateHud();
-  startDriftPhase();
+  drawArena();
 }
 
-function endTurn() {
-  if (state.phase !== "action") return;
-  state.currentPlayer = state.currentPlayer === 1 ? 2 : 1;
-  if (state.currentPlayer === 1) state.turn += 1;
-  beginTurn(true);
+function startBattleLoop() {
+  state.running = true;
+  state.elapsed = 0;
+  state.effects = [];
+  let last = performance.now();
+
+  if (state.animId) cancelAnimationFrame(state.animId);
+
+  function tick(now) {
+    if (!state.running) return;
+    const dt = Math.min(0.033, (now - last) / 1000);
+    last = now;
+    battleStep(dt);
+    state.animId = requestAnimationFrame(tick);
+  }
+
+  state.animId = requestAnimationFrame(tick);
 }
 
 function initBattle() {
   const h1 = getHeroDef(state.p1Hero);
   const h2 = getHeroDef(state.p2Hero);
+  const v1 = randomVelocity();
+  const v2 = randomVelocity();
 
   state.fighters = [
     {
       player: 1, name: "Player 1", heroId: state.p1Hero,
       hp: h1.hp, maxHp: h1.hp,
-      x: CENTER - 70, y: CENTER,
-      vx: 0, vy: 0, cooldown: 0, shield: 0, usedPowerThisTurn: false, bounces: 0
+      x: CENTER - 65, y: CENTER - 40,
+      vx: v1.vx, vy: v1.vy,
+      powerTimer: h1.power.interval * 0.5,
+      shield: 0
     },
     {
       player: 2, name: "Player 2", heroId: state.p2Hero,
       hp: h2.hp, maxHp: h2.hp,
-      x: CENTER + 70, y: CENTER,
-      vx: 0, vy: 0, cooldown: 0, shield: 0, usedPowerThisTurn: false, bounces: 0
+      x: CENTER + 65, y: CENTER + 40,
+      vx: v2.vx, vy: v2.vy,
+      powerTimer: h2.power.interval * 0.5,
+      shield: 0
     }
   ];
 
-  state.currentPlayer = 1;
-  state.turn = 1;
   state.log = [];
-  state.effects = [];
   addLog("<strong>FIGHT!</strong> " + h1.name + " vs " + h2.name);
+  document.getElementById("status-banner").textContent = "WATCH THE BRAWL";
+  updateHud();
+  drawArena();
   show("screen-battle");
-  beginTurn(false);
+  startBattleLoop();
 }
 
 function renderHeroGrid() {
@@ -762,7 +633,6 @@ function showHandoff(title, subHtml, next) {
   document.getElementById("handoff-title").textContent = title;
   document.getElementById("handoff-sub").innerHTML = subHtml;
   state.handoffNext = next;
-  if (state.animId) cancelAnimationFrame(state.animId);
   show("screen-handoff");
 }
 
@@ -770,10 +640,10 @@ function confirmPick() {
   if (!state.selectedHero) return;
   if (state.pickStep === 1) {
     state.p1Hero = state.selectedHero;
-    showHandoff("Pass to Player 2", "Pick a hero — don't peek at Player 1's choice!", "pick2");
+    showHandoff("Pass to Player 2", "Pick a hero — don't peek!", "pick2");
   } else {
     state.p2Hero = state.selectedHero;
-    showHandoff("Pass to Player 1", "<strong>Player 1</strong> goes first!", "battle");
+    showHandoff("Ready to Watch?", "Both heroes locked in.<br>Tap <strong>Start Fight</strong> and enjoy the show!", "battle");
   }
 }
 
@@ -785,20 +655,11 @@ document.getElementById("btn-confirm-pick").addEventListener("click", confirmPic
 document.getElementById("btn-handoff").addEventListener("click", () => {
   if (state.handoffNext === "pick2") showPickScreen(2);
   else if (state.handoffNext === "battle") initBattle();
-  else if (state.handoffNext === "resume") {
-    state.handoffNext = null;
-    show("screen-battle");
-    beginTurn(false);
-  }
 });
-document.getElementById("btn-power").addEventListener("click", usePower);
-document.getElementById("btn-end-turn").addEventListener("click", endTurn);
-document.getElementById("btn-rematch").addEventListener("click", () => showPickScreen(1));
-document.getElementById("btn-quit").addEventListener("click", () => {
-  if (window.confirm("Quit?")) {
-    if (state.animId) cancelAnimationFrame(state.animId);
-    show("screen-title");
-  }
+document.getElementById("btn-rematch").addEventListener("click", () => {
+  state.running = false;
+  if (state.animId) cancelAnimationFrame(state.animId);
+  showPickScreen(1);
 });
 </script>
 </body>
