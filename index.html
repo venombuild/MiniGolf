@@ -205,7 +205,13 @@ body::before {
 .reveal-btn.hide-state { background: #222; color: var(--sub); border: 1px solid #333; }
 
 .handoff-inner { text-align: center; width: 100%; max-width: 300px; }
-.handoff-icon { font-size: 52px; margin-bottom: 14px; }
+.handoff-icon {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 28px;
+  letter-spacing: 6px;
+  margin-bottom: 14px;
+  color: var(--gold);
+}
 .handoff-title {
   font-family: 'Bebas Neue', sans-serif;
   font-size: clamp(32px, 9vw, 50px);
@@ -304,7 +310,7 @@ body::before {
 }
 .char-card.eliminated::before { opacity: 0; }
 .char-card.eliminated::after {
-  content: '✕';
+  content: 'X';
   position: absolute; inset: 0;
   display: flex; align-items: center; justify-content: center;
   font-size: 18px; color: var(--elim-text);
@@ -452,7 +458,9 @@ body.wrong-flash { animation: flash-red 0.4s ease-out; }
 .game-tile.placeholder:hover { border-color: var(--card-border); background: var(--card-bg); }
 
 .game-tile-icon {
-  font-size: 32px;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 26px;
+  letter-spacing: 2px;
   line-height: 1;
   margin-bottom: 2px;
 }
@@ -565,7 +573,7 @@ body.wrong-flash { animation: flash-red 0.4s ease-out; }
 
 <div class="screen hidden" id="screen-handoff">
   <div class="handoff-inner">
-    <div class="handoff-icon">📲</div>
+    <div class="handoff-icon">PASS</div>
     <div class="handoff-title" id="handoff-title">Pass the Phone</div>
     <p class="handoff-sub" id="handoff-sub">Hand it to <strong>Player 2</strong>.<br>Don't let them see the screen.</p>
     <button type="button" class="btn btn-primary" id="btn-handoff" style="margin:0 auto;">Ready</button>
@@ -592,7 +600,7 @@ body.wrong-flash { animation: flash-red 0.4s ease-out; }
     <div class="board-grid" id="board-grid"></div>
 
     <div class="board-actions">
-      <button type="button" class="btn btn-primary btn-sm" id="btn-guess" style="flex:2;">⚡ Final Guess</button>
+      <button type="button" class="btn btn-primary btn-sm" id="btn-guess" style="flex:2;">Final Guess</button>
       <button type="button" class="btn btn-secondary btn-sm" id="btn-end-turn" style="flex:1.2;">End Turn</button>
       <button type="button" class="btn btn-ghost btn-sm" id="btn-new-game" style="flex:0.8;font-size:12px;">New</button>
     </div>
@@ -679,12 +687,12 @@ function setContinueEnabled(enabled) {
 }
 
 const GAMES = [
-  { id: "guess-who", name: "Marvel Guess Who", subtitle: "Pass & Play", icon: "🦸", available: true },
-  { id: "marvel-brawl", name: "Marvel Brawl", subtitle: "Arena Fight", icon: "⚔️", available: true },
-  { id: "placeholder-3", name: "Game 03", subtitle: "Coming Soon", icon: "🎯", available: false },
-  { id: "placeholder-4", name: "Game 04", subtitle: "Coming Soon", icon: "🃏", available: false },
-  { id: "placeholder-5", name: "Game 05", subtitle: "Coming Soon", icon: "🎲", available: false },
-  { id: "placeholder-6", name: "Game 06", subtitle: "Coming Soon", icon: "🎮", available: false }
+  { id: "guess-who", name: "Marvel Guess Who", subtitle: "Pass & Play", icon: "GW", available: true },
+  { id: "marvel-brawl", name: "Marvel Brawl", subtitle: "Arena Fight", icon: "MB", available: true },
+  { id: "placeholder-3", name: "Game 03", subtitle: "Coming Soon", icon: "--", available: false },
+  { id: "placeholder-4", name: "Game 04", subtitle: "Coming Soon", icon: "--", available: false },
+  { id: "placeholder-5", name: "Game 05", subtitle: "Coming Soon", icon: "--", available: false },
+  { id: "placeholder-6", name: "Game 06", subtitle: "Coming Soon", icon: "--", available: false }
 ];
 
 function showMenu() {
