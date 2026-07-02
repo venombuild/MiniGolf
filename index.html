@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>Marvel Guess Who</title>
+<title>Game Hub</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@400;600;700&display=swap" rel="stylesheet">
@@ -378,12 +378,141 @@ body::before {
   100% { background: var(--dark); }
 }
 body.wrong-flash { animation: flash-red 0.4s ease-out; }
+
+/* ===== MAIN MENU ===== */
+.menu-wrap {
+  width: 100%;
+  max-width: 480px;
+  padding-top: 8px;
+}
+
+.menu-header {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.menu-eyebrow {
+  font-size: 11px;
+  letter-spacing: 6px;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 8px;
+}
+
+.menu-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(48px, 14vw, 72px);
+  letter-spacing: 4px;
+  line-height: 0.9;
+  color: var(--text);
+  text-shadow: 3px 3px 0 var(--red-dark);
+}
+
+.menu-sub {
+  margin-top: 10px;
+  font-size: 14px;
+  color: var(--sub);
+  letter-spacing: 1px;
+}
+
+.game-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  width: 100%;
+}
+
+.game-tile {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-top: 3px solid var(--red);
+  padding: 18px 12px 14px;
+  text-align: center;
+  cursor: pointer;
+  transition: transform 0.12s, border-color 0.15s, background 0.15s;
+  touch-action: manipulation;
+  min-height: 132px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
+}
+
+.game-tile:active { transform: scale(0.96); }
+.game-tile:hover { border-color: #444; background: #222; }
+
+.game-tile.placeholder {
+  opacity: 0.42;
+  cursor: not-allowed;
+  border-top-color: #333;
+}
+.game-tile.placeholder:active { transform: none; }
+.game-tile.placeholder:hover { border-color: var(--card-border); background: var(--card-bg); }
+
+.game-tile-icon {
+  font-size: 32px;
+  line-height: 1;
+  margin-bottom: 2px;
+}
+
+.game-tile-name {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 18px;
+  letter-spacing: 1px;
+  color: var(--text);
+  line-height: 1.1;
+}
+
+.game-tile-sub {
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--sub);
+}
+
+.game-tile-badge {
+  margin-top: 4px;
+  font-size: 9px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--gold);
+  border: 1px solid rgba(245, 166, 35, 0.35);
+  padding: 2px 8px;
+}
+
+.back-btn {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 14px;
+  letter-spacing: 3px;
+  background: transparent;
+  border: none;
+  color: var(--sub);
+  cursor: pointer;
+  padding: 8px 0;
+  margin-bottom: 12px;
+  align-self: flex-start;
+}
+.back-btn:active { color: var(--text); }
 </style>
 </head>
 <body>
 
-<div class="screen" id="screen-title">
+<div class="screen" id="screen-menu">
+  <div class="menu-wrap">
+    <div class="menu-header">
+      <p class="menu-eyebrow">Venombuild</p>
+      <h1 class="menu-title">GAME HUB</h1>
+      <p class="menu-sub">Pick a game — more coming soon</p>
+    </div>
+    <div class="game-grid" id="game-grid"></div>
+  </div>
+</div>
+
+<div class="screen hidden" id="screen-title">
   <div style="text-align:center;max-width:320px;">
+    <button type="button" class="back-btn" id="btn-back-menu" style="margin:0 auto 8px;display:block;">&larr; Menu</button>
     <div class="marvel-banner"><span>MARVEL</span></div>
     <div class="title-logo">GUESS<br>WHO</div>
     <div class="title-rule">
@@ -398,6 +527,7 @@ body.wrong-flash { animation: flash-red 0.4s ease-out; }
 
 <div class="screen hidden" id="screen-setup">
   <div class="setup-section">
+    <button type="button" class="back-btn" id="btn-back-title">&larr; Back</button>
     <div class="player-tag">Player 1</div>
     <p class="setup-label" style="margin-top:12px;">Codename</p>
     <input class="player-input" id="p1-name" type="text" placeholder="Tony Stark" maxlength="16" autocomplete="off">
@@ -548,11 +678,56 @@ function setContinueEnabled(enabled) {
   contBtn.disabled = !enabled;
 }
 
+const GAMES = [
+  { id: "guess-who", name: "Marvel Guess Who", subtitle: "Pass & Play", icon: "🦸", available: true },
+  { id: "placeholder-2", name: "Game 02", subtitle: "Coming Soon", icon: "🎮", available: false },
+  { id: "placeholder-3", name: "Game 03", subtitle: "Coming Soon", icon: "🎯", available: false },
+  { id: "placeholder-4", name: "Game 04", subtitle: "Coming Soon", icon: "🃏", available: false },
+  { id: "placeholder-5", name: "Game 05", subtitle: "Coming Soon", icon: "🎲", available: false },
+  { id: "placeholder-6", name: "Game 06", subtitle: "Coming Soon", icon: "⚡", available: false }
+];
+
+function showMenu() {
+  state.handoffNext = null;
+  state.secretVisible = false;
+  state.secretRevealedOnce = false;
+  closeGuessModal();
+  show("screen-menu");
+}
+
 function showTitle() {
   state.handoffNext = null;
   state.secretVisible = false;
   state.secretRevealedOnce = false;
   show("screen-title");
+}
+
+function renderMenu() {
+  const grid = document.getElementById("game-grid");
+  grid.innerHTML = "";
+
+  GAMES.forEach((game) => {
+    const tile = document.createElement("button");
+    tile.type = "button";
+    tile.className = "game-tile" + (game.available ? "" : " placeholder");
+    tile.disabled = !game.available;
+
+    tile.innerHTML =
+      '<span class="game-tile-icon">' + game.icon + "</span>" +
+      '<span class="game-tile-name">' + game.name + "</span>" +
+      '<span class="game-tile-sub">' + game.subtitle + "</span>" +
+      (game.available ? "" : '<span class="game-tile-badge">Locked</span>');
+
+    if (game.available) {
+      tile.addEventListener("click", () => openGame(game.id));
+    }
+
+    grid.appendChild(tile);
+  });
+}
+
+function openGame(id) {
+  if (id === "guess-who") showTitle();
 }
 
 function showSetup() {
@@ -790,9 +965,11 @@ function submitGuess() {
 }
 
 function confirmNewGame() {
-  if (window.confirm("Start a new game?")) showTitle();
+  if (window.confirm("Leave this game and return to the menu?")) showMenu();
 }
 
+document.getElementById("btn-back-menu").addEventListener("click", showMenu);
+document.getElementById("btn-back-title").addEventListener("click", showTitle);
 document.getElementById("btn-assemble").addEventListener("click", showSetup);
 document.getElementById("btn-start").addEventListener("click", startGame);
 document.getElementById("reveal-toggle-btn").addEventListener("click", toggleReveal);
@@ -818,6 +995,9 @@ document.getElementById("guess-modal").addEventListener("click", (event) => {
     if (event.key === "Enter") startGame();
   });
 });
+
+renderMenu();
+showMenu();
 </script>
 </body>
 </html>

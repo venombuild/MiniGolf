@@ -1,6 +1,11 @@
-# Marvel Guess Who
+# Game Hub
 
-A two-player pass-the-phone guessing game built with plain HTML, CSS, and JavaScript.
+A mobile-friendly pass-the-phone game collection. Open the hub, pick a game, and play.
+
+## Games
+
+- **Marvel Guess Who** — two-player deduction (available now)
+- More games coming soon (placeholders on the menu)
 
 ## Play
 
