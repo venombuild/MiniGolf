@@ -249,19 +249,19 @@ const BALL_SPEED = 165;
 const HEROES = {
   ironman: {
     id: "ironman", name: "Iron Man", icon: "🤖", color: "#c41e2a", hp: 100,
-    power: { name: "Unibeam", damage: 12, range: 140, interval: 3.2, beam: true }
+    power: { type: "beam", name: "Unibeam", damage: 12, range: 140, interval: 3.2, windup: 0.5, beam: true }
   },
   cap: {
     id: "cap", name: "Captain America", icon: "🛡️", color: "#1e4a8c", hp: 115,
-    power: { name: "Shield Throw", damage: 10, range: 95, interval: 2.4, shield: 8 }
+    power: { type: "beam", name: "Shield Throw", damage: 10, range: 95, interval: 2.4, windup: 0.4, shield: 8 }
   },
   thor: {
     id: "thor", name: "Thor", icon: "⚡", color: "#6b4ce6", hp: 105,
-    power: { name: "Lightning", damage: 9, range: 9999, interval: 2.8, global: true }
+    power: { type: "beam", name: "Lightning", damage: 9, range: 9999, interval: 2.8, windup: 0.45, global: true, lightning: true }
   },
   hulk: {
     id: "hulk", name: "Hulk", icon: "💪", color: "#3d8b37", hp: 135,
-    power: { name: "Smash", damage: 18, range: 55, interval: 3.8 }
+    power: { type: "touch", name: "Smash", damage: 18, interval: 3.8 }
   }
 };
 
@@ -294,6 +294,14 @@ function dist(a, b) {
   const dx = a.x - b.x;
   const dy = a.y - b.y;
   return Math.sqrt(dx * dx + dy * dy);
+}
+
+function ballsTouching(a, b) {
+  return dist(a, b) <= BALL_R * 2 + 1;
+}
+
+function isFrozen(fighter) {
+  return fighter.windup || fighter.recover > 0;
 }
 
 function addLog(msg) {
@@ -332,8 +340,10 @@ function resolveBallCollision(a, b) {
   const dy = b.y - a.y;
   const d = Math.sqrt(dx * dx + dy * dy);
   const minD = BALL_R * 2;
+  let touched = false;
 
   if (d < minD && d > 0) {
+    touched = true;
     const nx = dx / d;
     const ny = dy / d;
     const overlap = minD - d;
@@ -342,41 +352,64 @@ function resolveBallCollision(a, b) {
     b.x += nx * overlap * 0.5;
     b.y += ny * overlap * 0.5;
 
-    const dvn = (a.vx - b.vx) * nx + (a.vy - b.vy) * ny;
-    if (dvn > 0) {
-      a.vx -= dvn * nx;
-      a.vy -= dvn * ny;
-      b.vx += dvn * nx;
-      b.vy += dvn * ny;
-    }
+    if (!isFrozen(a) && !isFrozen(b)) {
+      const dvn = (a.vx - b.vx) * nx + (a.vy - b.vy) * ny;
+      if (dvn > 0) {
+        a.vx -= dvn * nx;
+        a.vy -= dvn * ny;
+        b.vx += dvn * nx;
+        b.vy += dvn * ny;
+      }
 
-    const sa = Math.sqrt(a.vx * a.vx + a.vy * a.vy) || 1;
-    const sb = Math.sqrt(b.vx * b.vx + b.vy * b.vy) || 1;
-    a.vx = (a.vx / sa) * BALL_SPEED;
-    a.vy = (a.vy / sa) * BALL_SPEED;
-    b.vx = (b.vx / sb) * BALL_SPEED;
-    b.vy = (b.vy / sb) * BALL_SPEED;
+      const sa = Math.sqrt(a.vx * a.vx + a.vy * a.vy) || 1;
+      const sb = Math.sqrt(b.vx * b.vx + b.vy * b.vy) || 1;
+      a.vx = (a.vx / sa) * BALL_SPEED;
+      a.vy = (a.vy / sa) * BALL_SPEED;
+      b.vx = (b.vx / sb) * BALL_SPEED;
+      b.vy = (b.vy / sb) * BALL_SPEED;
+    }
   }
+
+  if (touched) tryTouchPowers(a, b);
 }
 
-function canHit(attacker, defender) {
+function tryTouchPowers(a, b) {
+  [[a, b], [b, a]].forEach(([attacker, defender]) => {
+    const power = getHeroDef(attacker.heroId).power;
+    if (power.type !== "touch") return;
+    if (isFrozen(attacker)) return;
+    if (attacker.powerTimer < power.interval) return;
+    firePower(attacker, defender);
+  });
+}
+
+function canStartBeam(attacker, defender) {
   const p = getHeroDef(attacker.heroId).power;
+  if (p.type !== "beam") return false;
   if (p.global) return true;
   return dist(attacker, defender) <= p.range;
+}
+
+function startWindup(attacker, defender) {
+  const power = getHeroDef(attacker.heroId).power;
+  attacker.savedVx = attacker.vx;
+  attacker.savedVy = attacker.vy;
+  attacker.vx = 0;
+  attacker.vy = 0;
+  attacker.windup = { defender, timeLeft: power.windup };
 }
 
 function firePower(attacker, defender) {
   const hero = getHeroDef(attacker.heroId);
   const power = hero.power;
-  if (!canHit(attacker, defender)) return false;
 
   let damage = power.damage;
 
   if (power.beam) {
     state.effects.push({ type: "beam", until: state.elapsed + 0.35, x1: attacker.x, y1: attacker.y, x2: defender.x, y2: defender.y });
-  } else if (power.global) {
+  } else if (power.lightning) {
     state.effects.push({ type: "lightning", until: state.elapsed + 0.35, x1: attacker.x, y1: attacker.y, x2: defender.x, y2: defender.y });
-  } else if (power.name === "Smash") {
+  } else if (power.type === "touch") {
     state.effects.push({ type: "smash", until: state.elapsed + 0.3, x: defender.x, y: defender.y, r: 38 });
   } else {
     state.effects.push({ type: "beam", until: state.elapsed + 0.3, x1: attacker.x, y1: attacker.y, x2: defender.x, y2: defender.y });
@@ -482,6 +515,15 @@ function drawArena() {
   state.fighters.forEach((f) => {
     const hero = getHeroDef(f.heroId);
 
+    if (f.windup) {
+      const pulse = 1 + Math.sin(state.elapsed * 14) * 0.08;
+      ctx.beginPath();
+      ctx.arc(f.x, f.y, BALL_R + 10 * pulse, 0, Math.PI * 2);
+      ctx.strokeStyle = "rgba(245,166,35,0.7)";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
     ctx.beginPath();
     ctx.arc(f.x, f.y, BALL_R + 3, 0, Math.PI * 2);
     ctx.strokeStyle = f.player === 1 ? "#E8192C" : "#1e6fd4";
@@ -512,27 +554,66 @@ function drawArena() {
   });
 }
 
+function updateFighterAction(fighter, dt) {
+  if (fighter.windup) {
+    fighter.windup.timeLeft -= dt;
+    if (fighter.windup.timeLeft <= 0) {
+      const target = fighter.windup.defender;
+      fighter.windup = null;
+      if (state.running && target.hp > 0) {
+        firePower(fighter, target);
+        if (!state.running) return;
+      }
+      fighter.recover = 0.25;
+    }
+    return;
+  }
+
+  if (fighter.recover > 0) {
+    fighter.recover -= dt;
+    if (fighter.recover <= 0) {
+      const sx = fighter.savedVx || 0;
+      const sy = fighter.savedVy || 0;
+      const speed = Math.sqrt(sx * sx + sy * sy);
+      if (speed < 10) {
+        const v = randomVelocity();
+        fighter.vx = v.vx;
+        fighter.vy = v.vy;
+      } else {
+        fighter.vx = (sx / speed) * BALL_SPEED;
+        fighter.vy = (sy / speed) * BALL_SPEED;
+      }
+    }
+  }
+}
+
 function battleStep(dt) {
+  if (!state.running) return;
+
   state.elapsed += dt;
   const f1 = state.fighters[0];
   const f2 = state.fighters[1];
 
+  [f1, f2].forEach((fighter) => updateFighterAction(fighter, dt));
+  if (!state.running) return;
+
   [f1, f2].forEach((ball) => {
+    if (isFrozen(ball)) return;
     ball.x += ball.vx * dt;
     ball.y += ball.vy * dt;
     resolveCircleWall(ball);
   });
   resolveBallCollision(f1, f2);
+  if (!state.running) return;
 
   [f1, f2].forEach((fighter) => {
+    if (isFrozen(fighter)) return;
     const opponent = fighter === f1 ? f2 : f1;
-    const hero = getHeroDef(fighter.heroId);
+    const power = getHeroDef(fighter.heroId).power;
     fighter.powerTimer += dt;
 
-    if (fighter.powerTimer >= hero.power.interval && canHit(fighter, opponent)) {
-      if (firePower(fighter, opponent)) {
-        if (!state.running) return;
-      }
+    if (power.type === "beam" && fighter.powerTimer >= power.interval && canStartBeam(fighter, opponent)) {
+      startWindup(fighter, opponent);
     }
   });
 
@@ -572,7 +653,7 @@ function initBattle() {
       x: CENTER - 65, y: CENTER - 40,
       vx: v1.vx, vy: v1.vy,
       powerTimer: h1.power.interval * 0.5,
-      shield: 0
+      shield: 0, windup: null, recover: 0, savedVx: 0, savedVy: 0
     },
     {
       player: 2, name: "Player 2", heroId: state.p2Hero,
@@ -580,7 +661,7 @@ function initBattle() {
       x: CENTER + 65, y: CENTER + 40,
       vx: v2.vx, vy: v2.vy,
       powerTimer: h2.power.interval * 0.5,
-      shield: 0
+      shield: 0, windup: null, recover: 0, savedVx: 0, savedVy: 0
     }
   ];
 
