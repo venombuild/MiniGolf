@@ -246,6 +246,10 @@ const ARENA_R = 150;
 const CENTER = 170;
 const BALL_SPEED = 165;
 
+const SHIELD_R = 13;
+const HAMMER_R = 15;
+const PROJECTILE_SPEED = 210;
+
 const HEROES = {
   ironman: {
     id: "ironman", name: "Iron Man", icon: "🤖", color: "#c41e2a", hp: 100,
@@ -253,11 +257,19 @@ const HEROES = {
   },
   cap: {
     id: "cap", name: "Captain America", icon: "🛡️", color: "#1e4a8c", hp: 115,
-    power: { type: "beam", name: "Shield Throw", damage: 10, range: 95, interval: 2.4, windup: 0.4, shield: 8 }
+    power: {
+      type: "shield", name: "Shield Throw", interval: 4.5, windup: 0.35,
+      shieldDamage: 6, shieldLife: 2.6, damageReduction: 0.5, buffTime: 5
+    }
   },
   thor: {
     id: "thor", name: "Thor", icon: "⚡", color: "#6b4ce6", hp: 105,
-    power: { type: "beam", name: "Lightning", damage: 9, range: 9999, interval: 2.8, windup: 0.45, global: true, lightning: true }
+    power: {
+      type: "hammer", name: "Mjolnir", interval: 4.0,
+      meleeDamage: 7, meleeInterval: 1.6,
+      hammerDamage: 11, orbitRadius: 56, orbitDuration: 2.4,
+      pullStrength: 300, pullDuration: 0.85
+    }
   },
   hulk: {
     id: "hulk", name: "Hulk", icon: "💪", color: "#3d8b37", hp: 135,
@@ -274,6 +286,7 @@ const state = {
   selectedHero: null,
   log: [],
   effects: [],
+  projectiles: [],
   running: false,
   animId: null,
   elapsed: 0
@@ -308,6 +321,196 @@ function addLog(msg) {
   state.log.unshift(msg);
   if (state.log.length > 3) state.log.pop();
   document.getElementById("battle-log").innerHTML = state.log.map((l) => "<div>" + l + "</div>").join("");
+}
+
+function hasProjectile(owner, type) {
+  return state.projectiles.some((p) => p.owner === owner && p.type === type);
+}
+
+function getOpponentOf(fighter) {
+  return state.fighters.find((f) => f.player !== fighter.player);
+}
+
+function resolveProjectileWall(proj) {
+  const dx = proj.x - CENTER;
+  const dy = proj.y - CENTER;
+  const d = Math.sqrt(dx * dx + dy * dy);
+  const maxD = ARENA_R - proj.r;
+
+  if (d > maxD && d > 0) {
+    const nx = dx / d;
+    const ny = dy / d;
+    proj.x = CENTER + nx * maxD;
+    proj.y = CENTER + ny * maxD;
+    const dot = proj.vx * nx + proj.vy * ny;
+    proj.vx -= 2 * dot * nx;
+    proj.vy -= 2 * dot * ny;
+    const speed = Math.sqrt(proj.vx * proj.vx + proj.vy * proj.vy) || 1;
+    proj.vx = (proj.vx / speed) * PROJECTILE_SPEED;
+    proj.vy = (proj.vy / speed) * PROJECTILE_SPEED;
+    proj.bounces += 1;
+  }
+}
+
+function dealDamage(attacker, defender, amount, effectType) {
+  if (!state.running || defender.hp <= 0) return;
+
+  let damage = amount;
+
+  if (defender.shieldBuff && defender.shieldBuff.until > state.elapsed) {
+    damage = Math.round(damage * (1 - defender.shieldBuff.reduction));
+  }
+
+  if (defender.shield > 0) {
+    const blocked = Math.min(defender.shield, damage);
+    damage -= blocked;
+    defender.shield -= blocked;
+  }
+
+  defender.hp = Math.max(0, defender.hp - damage);
+
+  const hero = getHeroDef(attacker.heroId);
+  const labels = { smash: "Smash", melee: "Strike", shield: "Shield", hammer: "Mjolnir", beam: hero.power.name };
+  addLog(hero.icon + " <strong>" + (labels[effectType] || "Hit") + "</strong> → " + damage + " dmg");
+
+  if (effectType === "smash") {
+    state.effects.push({ type: "smash", until: state.elapsed + 0.3, x: defender.x, y: defender.y, r: 38 });
+  }
+  if (effectType === "beam") {
+    state.effects.push({ type: "beam", until: state.elapsed + 0.35, x1: attacker.x, y1: attacker.y, x2: defender.x, y2: defender.y });
+  }
+  if (effectType === "hammer") {
+    state.effects.push({ type: "hammer", until: state.elapsed + 0.3, x1: attacker.x, y1: attacker.y, x2: defender.x, y2: defender.y });
+  }
+
+  if (defender.hp <= 0) endBattle(attacker);
+}
+
+function catchShield(fighter, proj) {
+  const power = getHeroDef(fighter.heroId).power;
+  fighter.shieldBuff = {
+    reduction: power.damageReduction,
+    until: state.elapsed + power.buffTime
+  };
+  fighter.powerTimer = 0;
+  state.projectiles = state.projectiles.filter((p) => p !== proj);
+  addLog("🛡️ <strong>Shield returned</strong> — Cap takes half damage!");
+}
+
+function launchShield(fighter, target) {
+  const dx = target.x - fighter.x;
+  const dy = target.y - fighter.y;
+  const d = Math.sqrt(dx * dx + dy * dy) || 1;
+  const power = getHeroDef(fighter.heroId).power;
+
+  state.projectiles.push({
+    type: "shield",
+    owner: fighter,
+    x: fighter.x,
+    y: fighter.y,
+    vx: (dx / d) * PROJECTILE_SPEED,
+    vy: (dy / d) * PROJECTILE_SPEED,
+    r: SHIELD_R,
+    life: power.shieldLife,
+    returning: false,
+    hitCd: 0,
+    bounces: 0
+  });
+  addLog("🛡️ <strong>Shield thrown!</strong>");
+}
+
+function launchHammer(fighter) {
+  const power = getHeroDef(fighter.heroId).power;
+  state.projectiles.push({
+    type: "hammer",
+    owner: fighter,
+    angle: Math.random() * Math.PI * 2,
+    orbitRadius: power.orbitRadius,
+    orbitSpeed: 4.2,
+    life: power.orbitDuration,
+    r: HAMMER_R,
+    hitCd: 0
+  });
+  fighter.powerTimer = 0;
+  addLog("⚡ <strong>Mjolnir orbiting!</strong>");
+}
+
+function updateProjectiles(dt) {
+  state.projectiles.forEach((proj) => {
+    if (proj.type === "shield") {
+      proj.hitCd = Math.max(0, proj.hitCd - dt);
+
+      if (proj.returning) {
+        const owner = proj.owner;
+        const dx = owner.x - proj.x;
+        const dy = owner.y - proj.y;
+        const d = Math.sqrt(dx * dx + dy * dy) || 1;
+        proj.vx = (dx / d) * PROJECTILE_SPEED * 1.3;
+        proj.vy = (dy / d) * PROJECTILE_SPEED * 1.3;
+        if (d < BALL_R + SHIELD_R + 4) {
+          catchShield(owner, proj);
+          return;
+        }
+      } else {
+        proj.life -= dt;
+        if (proj.life <= 0) proj.returning = true;
+      }
+
+      proj.x += proj.vx * dt;
+      proj.y += proj.vy * dt;
+      if (!proj.returning) resolveProjectileWall(proj);
+
+      state.fighters.forEach((f) => {
+        if (f === proj.owner || f.hp <= 0 || proj.hitCd > 0) return;
+        if (dist(proj, f) <= proj.r + BALL_R) {
+          const power = getHeroDef(proj.owner.heroId).power;
+          dealDamage(proj.owner, f, power.shieldDamage, "shield");
+          proj.hitCd = 0.45;
+        }
+      });
+    }
+
+    if (proj.type === "hammer") {
+      proj.life -= dt;
+      proj.hitCd = Math.max(0, proj.hitCd - dt);
+      const owner = proj.owner;
+      if (!owner || owner.hp <= 0) return;
+
+      proj.angle += proj.orbitSpeed * dt;
+      proj.x = owner.x + Math.cos(proj.angle) * proj.orbitRadius;
+      proj.y = owner.y + Math.sin(proj.angle) * proj.orbitRadius;
+
+      const hx = proj.x - CENTER;
+      const hy = proj.y - CENTER;
+      const hd = Math.sqrt(hx * hx + hy * hy);
+      if (hd > ARENA_R - HAMMER_R) {
+        const nx = hx / hd;
+        const ny = hy / hd;
+        proj.x = CENTER + nx * (ARENA_R - HAMMER_R);
+        proj.y = CENTER + ny * (ARENA_R - HAMMER_R);
+      }
+
+      state.fighters.forEach((f) => {
+        if (f === owner || f.hp <= 0 || proj.hitCd > 0) return;
+        if (dist(proj, f) <= proj.r + BALL_R) {
+          const power = getHeroDef(owner.heroId).power;
+          dealDamage(owner, f, power.hammerDamage, "hammer");
+          f.pull = {
+            toward: owner,
+            strength: power.pullStrength,
+            until: state.elapsed + power.pullDuration
+          };
+          proj.hitCd = 0.5;
+        }
+      });
+    }
+  });
+
+  state.projectiles = state.projectiles.filter((p) => {
+    if (p.type === "hammer" && p.life <= 0) return false;
+    if (p.type === "shield" && p.returning && p.owner.hp <= 0) return false;
+    return true;
+  });
 }
 
 function randomVelocity() {
@@ -375,63 +578,51 @@ function resolveBallCollision(a, b) {
 
 function tryTouchPowers(a, b) {
   [[a, b], [b, a]].forEach(([attacker, defender]) => {
+    if (isFrozen(attacker) || defender.hp <= 0) return;
     const power = getHeroDef(attacker.heroId).power;
-    if (power.type !== "touch") return;
-    if (isFrozen(attacker)) return;
-    if (attacker.powerTimer < power.interval) return;
-    firePower(attacker, defender);
+
+    if (power.type === "touch" && attacker.powerTimer >= power.interval) {
+      dealDamage(attacker, defender, power.damage, "smash");
+      attacker.powerTimer = 0;
+      return;
+    }
+
+    if (power.meleeDamage && attacker.meleeTimer >= power.meleeInterval) {
+      dealDamage(attacker, defender, power.meleeDamage, "melee");
+      attacker.meleeTimer = 0;
+    }
   });
 }
 
 function canStartBeam(attacker, defender) {
   const p = getHeroDef(attacker.heroId).power;
   if (p.type !== "beam") return false;
-  if (p.global) return true;
   return dist(attacker, defender) <= p.range;
 }
 
-function startWindup(attacker, defender) {
+function canThrowShield(fighter) {
+  if (hasProjectile(fighter, "shield")) return false;
+  if (fighter.shieldBuff && fighter.shieldBuff.until > state.elapsed) return false;
+  return true;
+}
+
+function startWindup(attacker, defender, kind) {
   const power = getHeroDef(attacker.heroId).power;
   attacker.savedVx = attacker.vx;
   attacker.savedVy = attacker.vy;
   attacker.vx = 0;
   attacker.vy = 0;
-  attacker.windup = { defender, timeLeft: power.windup };
+  attacker.windup = {
+    kind: kind || power.type,
+    defender,
+    timeLeft: power.windup || 0.35
+  };
 }
 
-function firePower(attacker, defender) {
-  const hero = getHeroDef(attacker.heroId);
-  const power = hero.power;
-
-  let damage = power.damage;
-
-  if (power.beam) {
-    state.effects.push({ type: "beam", until: state.elapsed + 0.35, x1: attacker.x, y1: attacker.y, x2: defender.x, y2: defender.y });
-  } else if (power.lightning) {
-    state.effects.push({ type: "lightning", until: state.elapsed + 0.35, x1: attacker.x, y1: attacker.y, x2: defender.x, y2: defender.y });
-  } else if (power.type === "touch") {
-    state.effects.push({ type: "smash", until: state.elapsed + 0.3, x: defender.x, y: defender.y, r: 38 });
-  } else {
-    state.effects.push({ type: "beam", until: state.elapsed + 0.3, x1: attacker.x, y1: attacker.y, x2: defender.x, y2: defender.y });
-  }
-
-  if (defender.shield > 0) {
-    const blocked = Math.min(defender.shield, damage);
-    damage -= blocked;
-    defender.shield -= blocked;
-  }
-
-  defender.hp = Math.max(0, defender.hp - damage);
+function fireBeam(attacker, defender) {
+  const power = getHeroDef(attacker.heroId).power;
+  dealDamage(attacker, defender, power.damage, "beam");
   attacker.powerTimer = 0;
-  if (power.shield) attacker.shield = power.shield;
-
-  addLog(hero.icon + " <strong>" + power.name + "</strong> → " + damage + " dmg");
-
-  if (defender.hp <= 0) {
-    endBattle(attacker);
-    return true;
-  }
-  return true;
 }
 
 function endBattle(winner) {
@@ -460,6 +651,9 @@ function updateHud() {
       '<div class="fighter-hud-name">' + h.icon + " " + h.name + "</div>" +
       '<div class="hp-bar"><div class="hp-fill" style="width:' + pct + '%"></div></div>' +
       '<div class="hp-text">' + Math.ceil(f.hp) + " HP</div>" +
+      (f.shieldBuff && f.shieldBuff.until > state.elapsed
+        ? '<div style="font-size:10px;color:#5cf0ff;margin-top:2px;">🛡 Shield active</div>'
+        : "") +
       '<div class="power-meter"><div class="power-fill" style="width:' + charge + '%"></div></div>';
     hud.appendChild(div);
   });
@@ -492,14 +686,11 @@ function drawArena() {
       ctx.stroke();
       ctx.shadowBlur = 0;
     }
-    if (fx.type === "lightning") {
-      ctx.strokeStyle = "rgba(140,120,255,0.95)";
+    if (fx.type === "hammer") {
+      ctx.strokeStyle = "rgba(140,120,255,0.9)";
       ctx.lineWidth = 4;
       ctx.beginPath();
       ctx.moveTo(fx.x1, fx.y1);
-      const midX = (fx.x1 + fx.x2) / 2 + (Math.random() - 0.5) * 20;
-      const midY = (fx.y1 + fx.y2) / 2 + (Math.random() - 0.5) * 20;
-      ctx.lineTo(midX, midY);
       ctx.lineTo(fx.x2, fx.y2);
       ctx.stroke();
     }
@@ -509,6 +700,43 @@ function drawArena() {
       ctx.beginPath();
       ctx.arc(fx.x, fx.y, fx.r, 0, Math.PI * 2);
       ctx.stroke();
+    }
+  });
+
+  state.projectiles.forEach((proj) => {
+    if (proj.type === "shield") {
+      ctx.beginPath();
+      ctx.arc(proj.x, proj.y, proj.r, 0, Math.PI * 2);
+      ctx.fillStyle = proj.returning ? "#5cf0ff" : "#1e4a8c";
+      ctx.fill();
+      ctx.strokeStyle = "#fff";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.font = "14px sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("🛡️", proj.x, proj.y + 1);
+    }
+    if (proj.type === "hammer") {
+      ctx.beginPath();
+      ctx.arc(proj.x, proj.y, proj.r, 0, Math.PI * 2);
+      ctx.fillStyle = "#6b4ce6";
+      ctx.fill();
+      ctx.strokeStyle = "#ddd";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.font = "14px sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("🔨", proj.x, proj.y + 1);
+
+      if (proj.owner) {
+        ctx.strokeStyle = "rgba(107,76,230,0.15)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(proj.owner.x, proj.owner.y, proj.orbitRadius, 0, Math.PI * 2);
+        ctx.stroke();
+      }
     }
   });
 
@@ -555,14 +783,31 @@ function drawArena() {
 }
 
 function updateFighterAction(fighter, dt) {
+  if (fighter.pull && fighter.pull.until > state.elapsed) {
+    const dx = fighter.pull.toward.x - fighter.x;
+    const dy = fighter.pull.toward.y - fighter.y;
+    const d = Math.sqrt(dx * dx + dy * dy) || 1;
+    fighter.vx += (dx / d) * fighter.pull.strength * dt;
+    fighter.vy += (dy / d) * fighter.pull.strength * dt;
+    const speed = Math.sqrt(fighter.vx * fighter.vx + fighter.vy * fighter.vy) || 1;
+    if (speed > BALL_SPEED * 1.4) {
+      fighter.vx = (fighter.vx / speed) * BALL_SPEED * 1.4;
+      fighter.vy = (fighter.vy / speed) * BALL_SPEED * 1.4;
+    }
+  } else {
+    fighter.pull = null;
+  }
+
   if (fighter.windup) {
     fighter.windup.timeLeft -= dt;
     if (fighter.windup.timeLeft <= 0) {
       const target = fighter.windup.defender;
+      const kind = fighter.windup.kind;
       fighter.windup = null;
-      if (state.running && target.hp > 0) {
-        firePower(fighter, target);
-        if (!state.running) return;
+
+      if (state.running && target && target.hp > 0) {
+        if (kind === "beam") fireBeam(fighter, target);
+        else if (kind === "shield") launchShield(fighter, target);
       }
       fighter.recover = 0.25;
     }
@@ -606,14 +851,26 @@ function battleStep(dt) {
   resolveBallCollision(f1, f2);
   if (!state.running) return;
 
+  updateProjectiles(dt);
+  if (!state.running) return;
+
   [f1, f2].forEach((fighter) => {
     if (isFrozen(fighter)) return;
     const opponent = fighter === f1 ? f2 : f1;
     const power = getHeroDef(fighter.heroId).power;
     fighter.powerTimer += dt;
+    if (power.meleeInterval) fighter.meleeTimer += dt;
 
     if (power.type === "beam" && fighter.powerTimer >= power.interval && canStartBeam(fighter, opponent)) {
-      startWindup(fighter, opponent);
+      startWindup(fighter, opponent, "beam");
+    }
+
+    if (power.type === "shield" && fighter.powerTimer >= power.interval && canThrowShield(fighter)) {
+      startWindup(fighter, opponent, "shield");
+    }
+
+    if (power.type === "hammer" && fighter.powerTimer >= power.interval && !hasProjectile(fighter, "hammer")) {
+      launchHammer(fighter);
     }
   });
 
@@ -625,6 +882,7 @@ function startBattleLoop() {
   state.running = true;
   state.elapsed = 0;
   state.effects = [];
+  state.projectiles = [];
   let last = performance.now();
 
   if (state.animId) cancelAnimationFrame(state.animId);
@@ -646,6 +904,7 @@ function initBattle() {
   const v1 = randomVelocity();
   const v2 = randomVelocity();
 
+  state.projectiles = [];
   state.fighters = [
     {
       player: 1, name: "Player 1", heroId: state.p1Hero,
@@ -653,7 +912,8 @@ function initBattle() {
       x: CENTER - 65, y: CENTER - 40,
       vx: v1.vx, vy: v1.vy,
       powerTimer: h1.power.interval * 0.5,
-      shield: 0, windup: null, recover: 0, savedVx: 0, savedVy: 0
+      meleeTimer: 0, shield: 0, shieldBuff: null, pull: null,
+      windup: null, recover: 0, savedVx: 0, savedVy: 0
     },
     {
       player: 2, name: "Player 2", heroId: state.p2Hero,
@@ -661,7 +921,8 @@ function initBattle() {
       x: CENTER + 65, y: CENTER + 40,
       vx: v2.vx, vy: v2.vy,
       powerTimer: h2.power.interval * 0.5,
-      shield: 0, windup: null, recover: 0, savedVx: 0, savedVy: 0
+      meleeTimer: 0, shield: 0, shieldBuff: null, pull: null,
+      windup: null, recover: 0, savedVx: 0, savedVy: 0
     }
   ];
 
