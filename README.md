@@ -4,8 +4,9 @@ A mobile-friendly pass-the-phone game collection. Open the hub, pick a game, and
 
 ## Games
 
-- **Marvel Guess Who** — two-player deduction (available now)
-- More games coming soon (placeholders on the menu)
+- **Marvel Guess Who** — two-player deduction
+- **Marvel Brawl** — turn-based arena fighter on a circular map
+- More games coming soon
 
 ## Play
 
